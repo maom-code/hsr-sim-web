@@ -117,6 +117,7 @@
   .wrap { overflow-x: auto; }
   .slot .fields select.rot { font-size: 12px; }
   .slot .fields select.rot.changed { border-color: #000; font-weight: 600; }
+  .slot .fields .gear-label { font-size: 12px; color: var(--muted); align-self: center; }
   .adj-toggle { font-size: 11px; padding: 2px 6px; justify-self: start; }
   .adj-toggle.on { border-color: #000; font-weight: 600; }
   .adj { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--surface-2); }
@@ -355,6 +356,10 @@ function sanitize(teams) {
         rot: c.rotations.some(([v]) => v === (m && m.rot)) ? m.rot : "auto",
         /* 必殺技の撃ち方。温存を選べないキャラや古い保存データは既定に戻す */
         ult: c.ults.some(([v]) => v === (m && m.ult)) ? m.ult : "asap",
+        /* 遺物構成。選べないキャラや古い保存データは既定（先頭）に戻す */
+        relic: c.relics.length ? (c.relics.some(([v]) => v === (m && m.relic)) ? m.relic : c.relics[0][0]) : null,
+        /* オーナメント。全キャラ共通で選べる。古い保存データは既定に戻す */
+        orn: c.ornaments.some(([v]) => v === (m && m.orn)) ? m.orn : "default",
         /* 手動調整は知っている項目の数字だけ残す（キャラに無い項目はサーバーが弾く） */
         adj: Object.fromEntries(Object.entries((m && m.adj) || {}).filter(([k, v]) =>
           state.opts.screen_stats.some((st) => st.key === k) && Number.isFinite(+v) && v !== "" && v !== null)
@@ -582,6 +587,37 @@ function slot(t, m, mi) {
     ultSel.classList.toggle("changed", (m.ult || "asap") !== "asap");
     ultSel.title = "必殺技を撃つタイミング";
   }
+  const relicDefault = c.relics.length ? c.relics[0][0] : null;
+  const relicSel = c.relics.length > 1 ? selectOf(c.relics, m.relic || relicDefault, (v) => {
+    m.relic = v; relicSel.classList.toggle("changed", v !== relicDefault);
+    gearLabel.textContent = gearText();
+    changed();
+  }, `${c.name}の遺物セット`) : null;
+  if (relicSel) {
+    relicSel.classList.add("rot");
+    relicSel.classList.toggle("changed", (m.relic || relicDefault) !== relicDefault);
+    relicSel.title = "遺物セットの組み合わせ";
+  }
+  const ornSel = selectOf(c.ornaments, m.orn || "default", (v) => {
+    m.orn = v; ornSel.classList.toggle("changed", v !== "default");
+    gearLabel.textContent = gearText();
+    changed();
+  }, `${c.name}のオーナメント`);
+  ornSel.classList.add("rot");
+  ornSel.classList.toggle("changed", (m.orn || "default") !== "default");
+  ornSel.title = "オーナメント(2個セット)の差し替え。ウェンワーク・ルサカは全キャラ共通で選べます";
+  /* 今どの遺物セットを着ているか。4pc はキャラ選択(relicSel が無ければ固定)、
+     2pc はオーナメント選択から、確認欄を結果側からここへ移した(2026-09-18 ユーザー指定) */
+  const gearText = () => {
+    const cavern = relicSel
+      ? (c.relics.find(([k]) => k === (m.relic || relicDefault)) || [, c.cavern_name])[1]
+      : c.cavern_name;
+    const orn = (c.ornaments.find(([k]) => k === (m.orn || "default")) || [, c.ornaments[0][1]])[1];
+    return `${cavern} / ${orn}`;
+  };
+  const gearLabel = el("div", "gear-label");
+  gearLabel.textContent = gearText();
+  gearLabel.title = "今装備している遺物セット(4個+2個)";
   const key = `${state.teams.indexOf(t)}-${mi}`;
   const toggle = el("button", "btn adj-toggle"); toggle.type = "button";
   const panel = el("div", "adj"); panel.hidden = !state.openAdj.has(key);
@@ -600,6 +636,8 @@ function slot(t, m, mi) {
   label();
   fields.append(who, es, lc, ms, rot);
   if (ultSel) fields.append(ultSel);
+  if (relicSel) fields.append(relicSel);
+  fields.append(ornSel, gearLabel);
   fields.append(toggle, panel);
   wrap.append(art, fields);
   if (!panel.hidden) fillAdj(panel, m, label);
