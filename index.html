@@ -1,0 +1,1004 @@
+<!doctype html>
+<html lang="ja"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hsr-sim 編成くらべ</title>
+<style>
+  /* 白背景・黒文字に固定（`hsr chart` と同じ。見比べる用途なので環境で変えない）。
+     配色は data-viz の既定カテゴリカルパレット（report.py と同じ並び） */
+  :root {
+    color-scheme: light;
+    --surface-1: #ffffff; --surface-2: #f2f1ee; --line: #dedcd6;
+    --text-primary: #000000; --text-secondary: #3d3c3a; --muted: #6f6e68;
+    --danger: #a3261c;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--surface-1); color: var(--text-primary);
+         font: 14px/1.5 "Yu Gothic UI", "Hiragino Sans", system-ui, sans-serif; }
+  .app { max-width: 1240px; margin: 0 auto; padding: 20px 20px 56px; }
+  header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; margin: 0 0 12px; }
+  h1 { font-size: 19px; margin: 0; }
+  h2 { font-size: 15px; margin: 0; }
+  .sub { color: var(--muted); font-size: 12px; }
+
+  .settings { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center;
+              padding: 10px 14px; background: var(--surface-2); border-radius: 10px; margin: 0 0 18px; }
+  .field { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-secondary); }
+  .seg-ctl { display: inline-flex; border: 1px solid var(--line); border-radius: 7px; overflow: hidden; background: #fff; }
+  .seg-ctl button { border: 0; background: none; padding: 4px 11px; font: inherit; cursor: pointer; color: var(--text-primary); }
+  .seg-ctl button + button { border-left: 1px solid var(--line); }
+  .seg-ctl button[aria-pressed="true"] { background: var(--text-primary); color: #fff; }
+  select, input[type="text"] { font: inherit; padding: 4px 6px; border: 1px solid var(--line);
+                               border-radius: 6px; background: #fff; color: inherit; min-width: 0; }
+  input[type="checkbox"] { width: 16px; height: 16px; accent-color: #000; }
+  button.btn { font: inherit; padding: 6px 13px; border: 1px solid var(--line); border-radius: 7px;
+               background: #fff; cursor: pointer; color: inherit; }
+  button.btn:hover { background: var(--surface-2); }
+  button.btn.primary { background: #000; color: #fff; border-color: #000; }
+  button.icon { border: 0; background: none; cursor: pointer; color: var(--text-secondary);
+                font: inherit; font-size: 12px; padding: 3px 7px; border-radius: 5px; }
+  button.icon:hover { background: var(--surface-2); color: #000; }
+  :focus-visible { outline: 2px solid #000; outline-offset: 2px; }
+
+  .section-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 10px; }
+  .section-head .grow { flex: 1; }
+  .teams { display: flex; flex-direction: column; gap: 10px; margin: 0 0 26px; }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 12px; }
+  .card-head { display: flex; align-items: center; gap: 6px; margin: 0 0 10px; }
+  .card-head .no { font-size: 12px; color: var(--muted); width: 18px; text-align: right; }
+  .card-head input { flex: 1; }
+  .slots { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .slot { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 8px; align-items: start; }
+  .slot .fields { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .slot .fields select { width: 100%; }
+  .slot .es { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+  .slot .ms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .slot .ms label { display: flex; flex-direction: column; font-size: 10px; color: var(--muted); min-width: 0; }
+  .slot .ms select { width: 100%; font-size: 12px; padding: 3px 2px; }
+  .slot .ms select.changed { border-color: #000; font-weight: 600; }
+
+  .art { position: relative; width: 52px; height: 52px; border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+  .art img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
+  .art .fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                   font-size: 11px; line-height: 1.15; text-align: center; color: var(--text-secondary); padding: 2px; }
+  .art .lc { position: absolute; right: 0; bottom: 0; width: 21px; height: 21px; z-index: 2;
+             border-radius: 4px 0 0 0; background: #fff; object-fit: contain; }
+
+  .status { font-size: 12px; color: var(--muted); min-height: 18px; }
+  .status.error { color: var(--danger); }
+  .meta { color: var(--text-secondary); font-size: 13px; margin: 0 0 2px; }
+  .hint { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 0 0 12px; }
+  .key { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); font-size: 12px; }
+  .key i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .row { display: grid; grid-template-columns: 250px minmax(0, 1fr) 118px; gap: 14px; align-items: center;
+         padding: 10px 0; border-top: 1px solid var(--line); }
+  .rlabel { font-size: 12px; color: var(--text-secondary); margin: 0 0 4px; }
+  .units { display: flex; gap: 5px; }
+  .unit { width: 52px; }
+  .badge { text-align: center; font-size: 10px; color: var(--text-secondary); margin-top: 2px; }
+  .track { display: flex; gap: 2px; align-items: stretch; height: 30px; }
+  .seg { position: relative; min-width: 3px; border-radius: 2px; display: flex; align-items: center;
+         justify-content: flex-end; padding: 0 6px; }
+  .seg:first-child { border-radius: 4px 2px 2px 4px; }
+  .seg:last-child { border-radius: 2px 4px 4px 2px; }
+  .seg .v { font-size: 11px; color: #fff; font-variant-numeric: tabular-nums;
+            text-shadow: 0 1px 2px rgba(0,0,0,.45); white-space: nowrap; }
+  .seg .tip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+              background: #000; color: #fff; padding: 6px 9px; border-radius: 6px; font-size: 12px;
+              white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .12s; z-index: 5; }
+  .seg:hover .tip, .seg:focus-visible .tip { opacity: 1; }
+  .total { text-align: right; font-variant-numeric: tabular-nums; }
+  .total b { font-size: 17px; display: block; }
+  .total .pct { font-size: 11px; color: var(--text-secondary); }
+  .msnote { margin: 4px 0 0; font-size: 11px; color: var(--text-secondary); }
+  .notes { margin: 6px 0 0; font-size: 12px; color: var(--danger); }
+  .notes summary { cursor: pointer; }
+  .notes ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-secondary); }
+  details.table { margin-top: 18px; }
+  details.table summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
+  table { border-collapse: collapse; margin-top: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
+  th, td { border: 1px solid var(--line); padding: 5px 9px; text-align: right; }
+  th[scope="row"] { text-align: left; font-weight: 500; }
+  thead th { color: var(--text-secondary); font-weight: 500; }
+  .wrap { overflow-x: auto; }
+  .slot .fields select.rot { font-size: 12px; }
+  .slot .fields select.rot.changed { border-color: #000; font-weight: 600; }
+  .adj-toggle { font-size: 11px; padding: 2px 6px; justify-self: start; }
+  .adj-toggle.on { border-color: #000; font-weight: 600; }
+  .adj { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--surface-2); }
+  .adj .adj-grid { display: grid; grid-template-columns: minmax(0, 1fr) 76px 14px; gap: 3px 6px; align-items: center; font-size: 12px; }
+  .adj .adj-grid span.l { color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .adj .adj-grid input { width: 100%; font: inherit; font-size: 12px; padding: 2px 4px; border: 1px solid var(--line); border-radius: 5px; text-align: right; font-variant-numeric: tabular-nums; }
+  .adj .adj-grid input.changed { border-color: #000; font-weight: 600; }
+  .adj .adj-foot button { white-space: nowrap; }
+  .adj .adj-foot { display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+  .io { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  footer.app-foot { margin-top: 28px; font-size: 11px; color: var(--muted); line-height: 1.8; }
+  footer.app-foot p { margin: 0 0 4px; }
+  footer.app-foot a { color: inherit; }
+  footer.app-foot .ver { opacity: .8; }
+  .caveats { margin-top: 24px; font-size: 12px; color: var(--muted); }
+  .caveats summary { cursor: pointer; font-weight: 700; }
+  .caveats ul { margin: 8px 0 0; padding-left: 1.2em; }
+  .caveats li { margin-bottom: 4px; }
+  .caveats b { color: var(--fg); }
+  .upgrade-btn { margin-top: 6px; font-size: 12px; padding: 3px 9px; }
+  #upgrade { margin: 22px 0 0; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  #upgrade .up-head { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 6px; }
+  #upgrade .up-head h2 { flex: 1; min-width: 12em; }
+  table.up { width: 100%; margin-top: 8px; }
+  table.up td, table.up th { text-align: right; vertical-align: top; }
+  table.up td.c, table.up th.c { text-align: left; }
+  table.up tr.first td { border-top: 2px solid var(--line); }
+  table.up tr.top td { font-weight: 600; }
+  table.up .chg { display: block; }
+  table.up .weak { display: block; font-weight: 400; font-size: 11px; color: var(--muted); }
+  details.battlelog { margin: 0 0 6px; }
+  details.battlelog > summary { cursor: pointer; color: var(--text-secondary); font-size: 12px; padding: 2px 0; }
+  .log-ctl { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin: 6px 0; font-size: 12px; }
+  .log-ctl input[type="text"] { width: 200px; }
+  .log-scroll { max-height: 520px; overflow: auto; border: 1px solid var(--line); border-radius: 8px; }
+  table.log { margin: 0; width: 100%; font-size: 12px; }
+  table.log th, table.log td { border: 0; border-bottom: 1px solid var(--surface-2); padding: 2px 8px; }
+  table.log thead th { position: sticky; top: 0; background: #fff; border-bottom: 1px solid var(--line); z-index: 1; }
+  table.log td, table.log th { width: 1%; white-space: nowrap; }
+  table.log td.t, table.log th.t { width: auto; text-align: left; white-space: pre-wrap; }
+  table.log td.a { text-align: left; white-space: nowrap; }
+  table.log tr.turn td { background: var(--surface-2); text-align: left; font-weight: 600; color: #000; }
+  table.log tr.dmg td.d { font-weight: 600; }
+  .export { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 0; }
+  .export input { width: 220px; }
+
+  @media (max-width: 980px) {
+    .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .row { grid-template-columns: minmax(0, 1fr) 100px; }
+    .row .track { grid-column: 1 / -1; order: 3; }
+  }
+  @media (max-width: 520px) {
+    .slots { grid-template-columns: minmax(0, 1fr); }
+  }
+</style></head>
+<body>
+<div class="app">
+  <header>
+    <h1>hsr-sim 編成くらべ</h1>
+    <span class="sub">キャラ・凸・光円錐・敵の数を切り替えると、その場で計算し直します</span>
+  </header>
+
+  <div class="settings" id="settings" aria-label="戦闘の条件"></div>
+
+  <div class="section-head">
+    <h2>編成</h2>
+    <span class="grow"></span>
+    <div class="io">
+      <button class="btn" id="save-file" title="編成と条件を JSON ファイルに保存">保存</button>
+      <button class="btn" id="load-file" title="保存した JSON ファイルを読み込む（いまの編成は置き換わります）">読み込み</button>
+      <input type="file" id="load-input" accept="application/json,.json" hidden>
+      <button class="btn" id="share" title="いまの編成と条件を入れたリンクをコピー">共有リンクをコピー</button>
+    </div>
+    <select id="preset" aria-label="プリセットから追加"></select>
+    <button class="btn" id="add">＋ 空の編成を追加</button>
+  </div>
+  <p class="status" id="io-status" role="status" aria-live="polite"></p>
+  <div class="teams" id="teams"></div>
+
+  <div class="section-head">
+    <h2>結果</h2>
+    <span class="status" id="status" role="status" aria-live="polite"></span>
+  </div>
+  <div id="results"></div>
+  <section id="upgrade" hidden aria-live="polite"></section>
+
+  <div class="export" id="export-box">
+    <input type="text" id="title" placeholder="画像のタイトル（例: 刃まわりの比較）" aria-label="書き出す画像のタイトル">
+    <button class="btn primary" id="export">画像で書き出す</button>
+    <span class="status" id="export-status" role="status" aria-live="polite"></span>
+  </div>
+  <details class="caveats">
+    <summary>この計算でやっていないこと</summary>
+    <ul>
+      <li><b>敵は倒れません。</b> HP を高くして殴り続けるので、弱点撃破・撃破ダメージ・超撃破は入れていません。
+        「敵を倒したら〜」「弱点撃破したら〜」で伸びるキャラ（不死途の撃破連鎖、長夜月の星魂 4、
+        キャストリスの星魂 6 など）は、そのぶん低く出ます</li>
+      <li><b>敵は既定では攻撃してきません。</b> 被弾で増える EP や、挑発・被ダメージ軽減・
+        バリア・治癒の価値は数字に出ません（「敵の攻撃」を入にすると一部は入ります）</li>
+      <li><b>敵はデバフを撒きません。</b> デバフ解除や効果抵抗を持つキャラは、そのぶんが効きません</li>
+      <li>味方は戦闘不能になりません。復活や「HP が 0 になっても倒れない」も効きません</li>
+      <li>会心は期待値で計算しています（乱数を振らず、会心率 × 会心ダメージで均します）</li>
+      <li id="caveat-break" hidden><b>弱点撃破は試験中です。</b>
+        敵 3 体は同じ靭性・全属性弱点で揃えています。撃破の行動遅延は 25% 固定、
+        「弱点撃破状態の敵に会心率アップ」は<b>撃破中の敵が 1 体でもいる間ずっと</b>
+        乗る近似です。超撃破と、撃破の属性別効果（裂傷・燃焼・纏縛など）はまだありません</li>
+    </ul>
+    <p>キャラごとの細かい未実装は、結果の行にある「未実装」の注記に出ます。</p>
+  </details>
+  <footer class="app-foot">
+    <p><b>非公式のファンメイドツールです。</b>個人が趣味で作ったもので、
+      HoYoverse や公式とは関係ありません。</p>
+    <p>数値は<b>自作シミュレータの計算値</b>です。実機と一致するとは限りません。
+      前提は上の「この計算でやっていないこと」を見てください。</p>
+    <p>キャラクターのアイコンは
+      <a href="https://github.com/Mar-7th/StarRailRes" target="_blank" rel="noopener noreferrer">StarRailRes</a>
+      のものを使わせてもらっています。ゲーム内の名称・画像は HoYoverse に帰属します。</p>
+    <p>間違いを見つけたら
+      <a href="https://x.com/houryu_ji" target="_blank" rel="noopener noreferrer">@houryu_ji</a>
+      まで教えてもらえると助かります。</p>
+    <p class="ver" id="app-foot-ver"></p>
+  </footer>
+</div>
+
+<script>
+/* 静的サイト版: 計算はこのブラウザの中（Web Worker 上の Python）で行う */
+window.HSR_BACKEND = (() => {
+  const worker = new Worker("worker.js", { type: "module" });
+  const pending = new Map();
+  let next = 0;
+  worker.onmessage = (ev) => {
+    const { id, ok, error, fatal } = ev.data;
+    const p = pending.get(id);
+    if (!p) return;
+    pending.delete(id);
+    if (error !== undefined) p.reject({ userError: error });
+    else if (fatal !== undefined) { console.error(fatal); p.reject(new Error(fatal)); }
+    else p.resolve(ok);
+  };
+  worker.onerror = (ev) => {
+    console.error(ev);
+    pending.forEach((p) => p.reject(new Error("worker error")));
+    pending.clear();
+  };
+  return {
+    kind: "static",
+    loadingMessage: "計算エンジンを読み込んでいます…（初回は十数秒かかることがあります）",
+    offlineMessage: "計算エンジンを読み込めませんでした。通信状況を確認して、ページを再読み込みしてください",
+    call(name, payload) {
+      return new Promise((resolve, reject) => {
+        const id = ++next;
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, name, payload: payload || {} });
+      });
+    },
+  };
+})();
+</script>
+<script>
+"use strict";
+const STORE = "hsr-gui-v1";
+const state = { opts: null, teams: [], settings: {}, results: null,
+                /* 結果を出したときの編成と条件。ログはこれで回し直す（画面を触った後でもずれない） */
+                ran: null, logs: {}, openLogs: new Set(),
+                /* 手動調整の欄を開いているキャラ（"編成番号-枠番号"） */
+                openAdj: new Set() };
+const $ = (s) => document.querySelector(s);
+
+/* 計算の呼び出し口。ローカルでは hsr gui の HTTP サーバー、静的サイト版では
+   ページが先に window.HSR_BACKEND（ブラウザ内の Python）を用意して差し替える。
+   どちらも「打ち間違いなど画面に出してよい失敗」は ApiError で投げる */
+class ApiError extends Error {}
+const backend = window.HSR_BACKEND || {
+  kind: "server",
+  offlineMessage: "サーバーに繋がりません。端末で hsr gui が動いているか確認してください",
+  async call(name, payload) {
+    const r = name === "options"
+      ? await fetch("/api/options")
+      : await fetch(`/api/${name}`, { method: "POST", headers: { "Content-Type": "application/json" },
+                                     body: JSON.stringify(payload || {}) });
+    const data = await r.json();
+    if (!r.ok) throw new ApiError(data.error || "計算に失敗しました");
+    return data;
+  },
+};
+function failMessage(e) {
+  if (e instanceof ApiError) return e.message;
+  if (e && e.userError) return e.userError;            /* 静的サイト版の打ち間違いなど */
+  return backend.offlineMessage || String(e);
+}
+
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+}
+function fmt(v) { return Math.round(v).toLocaleString("ja-JP"); }
+function shortName(n) { return n.replace("開拓者・", "").slice(0, 4); }
+function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
+
+function save() {
+  try { localStorage.setItem(STORE, JSON.stringify({ teams: state.teams, settings: state.settings })); } catch (e) {}
+}
+function load() {
+  try { return JSON.parse(localStorage.getItem(STORE) || "null"); } catch (e) { return null; }
+}
+
+function charById(id) { return state.opts.characters.find((c) => c.id === String(id)); }
+function lcName(id) {
+  const lc = state.opts.light_cones[id];
+  return lc ? `${"★".repeat(lc.rarity)} ${lc.name}` : id;
+}
+function newMember(id) {
+  const c = charById(id) || state.opts.characters[0];
+  return { id: c.id, e: c.fixed_eidolon ?? 0, s: c.fixed_superimpose ?? 1, lc: c.default_lc,
+           ms: { ...c.main_stats }, adj: {}, rot: "auto" };
+}
+function fromPreset(p) { return { label: p.label, members: p.members.map(newMember) }; }
+
+/* 保存しておいた編成に、もう選べないキャラが混ざっていたら差し替える */
+function sanitize(teams) {
+  return (teams || []).filter((t) => t && Array.isArray(t.members)).map((t) => ({
+    label: t.label || "",
+    members: t.members.slice(0, 4).map((m) => {
+      const c = charById(m.id);
+      if (!c) return newMember(state.opts.characters[0].id);
+      return {
+        id: c.id,
+        e: c.fixed_eidolon ?? Math.min(6, Math.max(0, +m.e || 0)),
+        s: c.fixed_superimpose ?? Math.min(5, Math.max(1, +m.s || 1)),
+        lc: c.lc_choices.includes(m.lc) ? m.lc : c.default_lc,
+        /* メインステは部位ごとに検証。選べない値や古い保存データはテンプレに戻す */
+        ms: Object.fromEntries(Object.keys(state.opts.slots).map((slot) => {
+          const v = m.ms && m.ms[slot];
+          return [slot, c.main_stat_choices[slot].includes(v) ? v : c.main_stats[slot]];
+        })),
+        /* ローテはそのキャラで選べるものだけ。古い保存データは既定に戻す */
+        rot: c.rotations.some(([v]) => v === (m && m.rot)) ? m.rot : "auto",
+        /* 必殺技の撃ち方。温存を選べないキャラや古い保存データは既定に戻す */
+        ult: c.ults.some(([v]) => v === (m && m.ult)) ? m.ult : "asap",
+        /* 手動調整は知っている項目の数字だけ残す（キャラに無い項目はサーバーが弾く） */
+        adj: Object.fromEntries(Object.entries((m && m.adj) || {}).filter(([k, v]) =>
+          state.opts.screen_stats.some((st) => st.key === k) && Number.isFinite(+v) && v !== "" && v !== null)
+          .map(([k, v]) => [k, +v])),
+      };
+    }),
+  }));
+}
+
+async function init() {
+  if (backend.loadingMessage) setStatus(backend.loadingMessage);
+  try {
+    state.opts = await backend.call("options");
+  } catch (e) {
+    setStatus(failMessage(e), true);
+    return;
+  }
+  /* 共有リンクで開いたらそちらを優先する。読んだらアドレスから消す（編集後の再読み込みで戻らないように） */
+  let saved = null, fromLink = false;
+  try { saved = await readShareHash(); fromLink = !!saved; } catch (e) { ioStatus("共有リンクが読めませんでした", true); }
+  if (!saved) saved = load();
+  state.settings = Object.assign({}, state.opts.defaults, (saved && saved.settings) || {});
+  state.teams = sanitize(saved && saved.teams);
+  if (!state.teams.length) state.teams = state.opts.presets.slice(0, 2).map(fromPreset);
+  if (fromLink) {
+    history.replaceState(null, "", location.pathname + location.search);
+    save();
+    ioStatus("共有リンクの編成を読み込みました");
+  }
+  const app = state.opts.app || {};
+  $("#app-foot-ver").textContent = `hsr-sim ${app.version || ""} ／ ゲームデータ ${app.data_version || ""}` +
+    (backend.kind === "server" ? "" : " ／ 計算はこのブラウザの中で行っています");
+  if (backend.kind !== "server") $("#export-box").hidden = true;   /* 画像の書き出しはローカル版だけ */
+  /* 弱点撃破の但し書きは試験機能を出しているときだけ */
+  $("#caveat-break").hidden = !state.opts.break_trial;
+  $("#save-file").addEventListener("click", saveFile);
+  $("#load-file").addEventListener("click", () => $("#load-input").click());
+  $("#load-input").addEventListener("change", loadFile);
+  $("#share").addEventListener("click", copyShareLink);
+
+  const preset = $("#preset");
+  preset.innerHTML = `<option value="">プリセットから追加…</option>` +
+    state.opts.presets.map((p, i) => `<option value="${i}">${esc(p.label)}</option>`).join("");
+  preset.addEventListener("change", () => {
+    if (preset.value === "") return;
+    state.teams.push(fromPreset(state.opts.presets[+preset.value]));
+    preset.value = "";
+    renderTeams(); changed();
+  });
+  $("#add").addEventListener("click", () => {
+    const last = state.teams[state.teams.length - 1];
+    state.teams.push(last ? { label: "", members: last.members.map((m) => ({ ...m })) }
+                          : fromPreset(state.opts.presets[0]));
+    renderTeams(); changed();
+  });
+  $("#export").addEventListener("click", exportImage);
+
+  renderSettings(); renderTeams(); run();
+}
+
+/* ---------------- 条件 ---------------- */
+
+function segmented(values, current, onPick, fmtLabel) {
+  const box = el("div", "seg-ctl");
+  values.forEach((v) => {
+    const b = el("button");
+    b.type = "button";
+    b.textContent = fmtLabel ? fmtLabel(v) : v;
+    b.setAttribute("aria-pressed", String(v === current));
+    b.addEventListener("click", () => { onPick(v); renderSettings(); changed(); });
+    box.appendChild(b);
+  });
+  return box;
+}
+function field(label, control) {
+  const f = el("label", "field");
+  const span = el("span"); span.textContent = label;
+  f.append(span, control);
+  return f;
+}
+function check(value, onChange, disabled) {
+  const c = el("input"); c.type = "checkbox"; c.checked = !!value; c.disabled = !!disabled;
+  c.addEventListener("change", () => { onChange(c.checked); renderSettings(); changed(); });
+  return c;
+}
+function selectOf(pairs, current, onChange, label) {
+  const s = el("select");
+  if (label) s.setAttribute("aria-label", label);
+  s.innerHTML = pairs.map(([v, t]) =>
+    `<option value="${esc(v)}"${String(v) === String(current) ? " selected" : ""}>${esc(t)}</option>`).join("");
+  s.addEventListener("change", () => onChange(s.value));
+  return s;
+}
+
+function renderSettings() {
+  const s = state.settings;
+  const root = $("#settings");
+  root.innerHTML = "";
+  const wrap = (label, ctl) => { const f = el("div", "field"); const t = el("span"); t.textContent = label; f.append(t, ctl); return f; };
+  root.append(
+    wrap("敵の数", segmented([1, 2, 3], s.enemies, (v) => { s.enemies = v; }, (v) => `${v} 体`)),
+    field("敵 Lv", selectOf([[90, "90"], [95, "95"]], s.enemy_level, (v) => { s.enemy_level = +v; changed(); }, "敵のレベル")),
+    field("敵の耐性", selectOf([[0.2, "20%（通常）"], [0, "0%（弱点）"]], s.enemy_res, (v) => { s.enemy_res = +v; changed(); }, "敵の耐性")),
+    field("サイクル", selectOf([[1, "1"], [2, "2"], [3, "3"], [5, "5"]], s.cycles, (v) => { s.cycles = +v; changed(); }, "サイクル数")),
+    field("秘技を使う", check(s.technique, (v) => { s.technique = v; })),
+    field("敵が攻撃する", check(s.enemy_attacks, (v) => { s.enemy_attacks = v; if (!v) s.enemy_hit_energy = false; })),
+    field("被弾で EP", check(s.enemy_hit_energy, (v) => { s.enemy_hit_energy = v; }, !s.enemy_attacks)),
+    /* 弱点撃破は試験機能。公開版ではスイッチごと出さない */
+    ...(state.opts.break_trial ? [
+      field("弱点撃破", check(s.weakness_break, (v) => { s.weakness_break = v; })),
+      field("靭性", selectOf([[120, "120（4本）"], [240, "240（8本）"], [360, "360（12本）"], [600, "600（20本）"]],
+        s.toughness, (v) => { s.toughness = +v; changed(); }, "敵の最大靭性（バー1本=30）")),
+    ] : []),
+  );
+}
+
+/* ---------------- 編成 ---------------- */
+
+function iconBtn(text, title, onClick) {
+  const b = el("button", "icon"); b.type = "button"; b.textContent = text; b.title = title;
+  b.setAttribute("aria-label", title);
+  b.addEventListener("click", onClick);
+  return b;
+}
+
+function renderTeams() {
+  const root = $("#teams");
+  root.innerHTML = "";
+  if (!state.teams.length) {
+    const p = el("p", "hint"); p.textContent = "編成がありません。右上のプリセットか「＋ 空の編成を追加」から始めてください";
+    root.appendChild(p);
+    return;
+  }
+  state.teams.forEach((t, ti) => root.appendChild(teamCard(t, ti)));
+}
+
+function teamCard(t, ti) {
+  const card = el("div", "card");
+  const head = el("div", "card-head");
+  const no = el("span", "no"); no.textContent = ti + 1;
+  const label = el("input"); label.type = "text"; label.value = t.label || "";
+  label.placeholder = "編成名（空ならキャラ名を並べる）";
+  label.setAttribute("aria-label", `編成 ${ti + 1} の名前`);
+  label.addEventListener("change", () => { t.label = label.value; changed(); });
+  const move = (d) => {
+    const j = ti + d;
+    if (j < 0 || j >= state.teams.length) return;
+    [state.teams[ti], state.teams[j]] = [state.teams[j], state.teams[ti]];
+    renderTeams(); changed();
+  };
+  head.append(no, label,
+    iconBtn("↑", "上へ（先頭の編成が 100% の基準）", () => move(-1)),
+    iconBtn("↓", "下へ", () => move(1)),
+    iconBtn("複製", "この編成を複製", () => {
+      state.teams.splice(ti + 1, 0, JSON.parse(JSON.stringify(t)));
+      renderTeams(); changed();
+    }),
+    iconBtn("削除", "この編成を削除", () => { state.teams.splice(ti, 1); renderTeams(); changed(); }));
+  const slots = el("div", "slots");
+  t.members.forEach((m, mi) => slots.appendChild(slot(t, m, mi)));
+  card.append(head, slots);
+  return card;
+}
+
+function artHtml(charId, name, lcId) {
+  const base = state.opts.icon_base;
+  const lc = lcId ? `<img class="lc" src="${base}/icon/light_cone/${esc(lcId)}.png" alt="" loading="lazy" onerror="this.remove()">` : "";
+  return `<span class="fallback">${esc(shortName(name))}</span>` +
+         `<img src="${base}/icon/character/${esc(charId)}.png" alt="" loading="lazy" onerror="this.remove()">${lc}`;
+}
+
+function slot(t, m, mi) {
+  const c = charById(m.id);
+  const wrap = el("div", "slot");
+  const art = el("div", "art");
+  art.innerHTML = artHtml(c.id, c.name, m.lc);
+  art.title = c.name;
+  const fields = el("div", "fields");
+  const who = selectOf(state.opts.characters.map((x) => [x.id, x.name]), m.id, (v) => {
+    t.members[mi] = newMember(v);
+    renderTeams(); changed();
+  }, `${mi + 1} 人目のキャラ`);
+  const es = el("div", "es");
+  /* 手動調整の欄が開いていたら、凸・重ね・メインステを変えたときに「元の値」を取り直す */
+  let refreshAdj = () => {};
+  const eSel = selectOf([0, 1, 2, 3, 4, 5, 6].map((v) => [v, `E${v}`]), m.e, (v) => { m.e = +v; refreshAdj(); changed(); }, "星魂");
+  const sSel = selectOf([1, 2, 3, 4, 5].map((v) => [v, `S${v}`]), m.s, (v) => { m.s = +v; refreshAdj(); changed(); }, "光円錐の重ね合わせ");
+  if (c.fixed_eidolon != null) { eSel.disabled = true; eSel.title = "このキャラは凸が固定です"; }
+  if (c.fixed_superimpose != null) { sSel.disabled = true; sSel.title = "このキャラの光円錐は重ねが固定です"; }
+  es.append(eSel, sSel);
+  const lc = selectOf(c.lc_choices.map((id) => [id, lcName(id)]), m.lc, (v) => {
+    m.lc = v; renderTeams(); changed();
+  }, "光円錐");
+  const ms = el("div", "ms");
+  Object.entries(state.opts.slots).forEach(([slotKey, slotName]) => {
+    const def = c.main_stats[slotKey];
+    const labels = state.opts.main_stat_labels;
+    const sel = selectOf(c.main_stat_choices[slotKey].map((v) =>
+      [v, labels[v] || v]), m.ms[slotKey], (v) => {
+      m.ms[slotKey] = v;
+      sel.classList.toggle("changed", v !== def);
+      refreshAdj();
+      changed();
+    }, `${slotName}のメインステ`);
+    sel.classList.toggle("changed", m.ms[slotKey] !== def);
+    sel.title = `${slotName}のメインステ（テンプレ: ${labels[def] || def}。変えると太枠になります）`;
+    const l = el("label"); l.append(document.createTextNode(slotName), sel);
+    ms.appendChild(l);
+  });
+  const rot = selectOf(c.rotations, m.rot || "auto", (v) => {
+    m.rot = v; rot.classList.toggle("changed", v !== "auto"); changed();
+  }, `${c.name}のローテ`);
+  rot.classList.add("rot");
+  rot.classList.toggle("changed", (m.rot || "auto") !== "auto");
+  rot.title = "戦闘スキルを振る頻度";
+  const ultSel = c.ults.length > 1 ? selectOf(c.ults, m.ult || "asap", (v) => {
+    m.ult = v; ultSel.classList.toggle("changed", v !== "asap"); changed();
+  }, `${c.name}の必殺技`) : null;
+  if (ultSel) {
+    ultSel.classList.add("rot");
+    ultSel.classList.toggle("changed", (m.ult || "asap") !== "asap");
+    ultSel.title = "必殺技を撃つタイミング";
+  }
+  const key = `${state.teams.indexOf(t)}-${mi}`;
+  const toggle = el("button", "btn adj-toggle"); toggle.type = "button";
+  const panel = el("div", "adj"); panel.hidden = !state.openAdj.has(key);
+  const label = () => {
+    const n = Object.keys(m.adj || {}).length;
+    toggle.textContent = n ? `ステータス調整中（${n}）` : "ステータスを調整";
+    toggle.classList.toggle("on", n > 0);
+    toggle.setAttribute("aria-expanded", String(!panel.hidden));
+  };
+  refreshAdj = () => { if (!panel.hidden) fillAdj(panel, m, label); };
+  toggle.addEventListener("click", () => {
+    panel.hidden = !panel.hidden;
+    if (panel.hidden) state.openAdj.delete(key); else state.openAdj.add(key);
+    label(); refreshAdj();
+  });
+  label();
+  fields.append(who, es, lc, ms, rot);
+  if (ultSel) fields.append(ultSel);
+  fields.append(toggle, panel);
+  wrap.append(art, fields);
+  if (!panel.hidden) fillAdj(panel, m, label);
+  return wrap;
+}
+
+/* ゲームのキャラ画面と同じ値を並べ、書き換えたところだけ m.adj に入れる。
+   空欄 = 調整しない。割合は画面どおり % で書く（中では 0.7 のような小数で持つ） */
+async function fillAdj(panel, m, onChange) {
+  const token = (panel.dataset.token = String(Math.random()));
+  if (!panel.firstChild) panel.innerHTML = `<p class="hint">画面の値を計算中…</p>`;
+  let data;
+  try {
+    data = await backend.call("screen", { member: { ...m, adj: {} } });
+  } catch (e) {
+    panel.innerHTML = `<p class="hint">${esc(failMessage(e))}</p>`;
+    return;
+  }
+  if (panel.dataset.token !== token) return;     /* 連打したときは最後の結果だけ使う */
+  m.adj = m.adj || {};
+  const grid = el("div", "adj-grid");
+  data.stats.forEach((st) => {
+    const shown = st.percent ? st.value * 100 : st.value;
+    const digits = st.percent ? 1 : (st.key === "spd" ? 1 : 0);
+    const l = el("span", "l"); l.textContent = st.label; l.title = st.label;
+    const input = el("input"); input.type = "text"; input.inputMode = "decimal";
+    input.placeholder = shown.toFixed(digits);
+    input.setAttribute("aria-label", `${data.name}の${st.label}（画面の値。空欄なら調整しない）`);
+    if (m.adj[st.key] != null) input.value = String(+(st.percent ? m.adj[st.key] * 100 : m.adj[st.key]).toFixed(4));
+    input.classList.toggle("changed", m.adj[st.key] != null);
+    input.addEventListener("change", () => {
+      const raw = input.value.trim().replace(/[,%％]/g, "");
+      if (raw === "") delete m.adj[st.key];
+      else if (Number.isFinite(+raw) && +raw >= 0) m.adj[st.key] = st.percent ? +raw / 100 : +raw;
+      else { input.value = ""; delete m.adj[st.key]; }
+      input.classList.toggle("changed", m.adj[st.key] != null);
+      onChange(); changed();
+    });
+    const u = el("span", "l"); u.textContent = st.percent ? "%" : "";
+    grid.append(l, input, u);
+  });
+  const foot = el("div", "adj-foot");
+  const hint = el("span"); hint.textContent = "薄い数字が今の画面の値。書いた欄だけその値にします";
+  const reset = el("button", "icon"); reset.type = "button"; reset.textContent = "元に戻す";
+  reset.addEventListener("click", () => { m.adj = {}; onChange(); changed(); fillAdj(panel, m, onChange); });
+  foot.append(hint, reset);
+  panel.innerHTML = "";
+  panel.append(grid, foot);
+}
+
+/* ---------------- 計算 ---------------- */
+
+let timer = null;
+let seq = 0;
+function changed() { save(); clearTimeout(timer); timer = setTimeout(run, 250); }
+function setStatus(text, error) {
+  const s = $("#status"); s.textContent = text; s.classList.toggle("error", !!error);
+}
+
+async function run() {
+  const my = ++seq;
+  if (!state.teams.length) { state.results = { rows: [] }; renderResults(); setStatus(""); return; }
+  setStatus("計算中…");
+  const sent = JSON.parse(JSON.stringify({ teams: state.teams.filter((t) => t.members.length), settings: state.settings }));
+  try {
+    const data = await backend.call("simulate", sent);
+    if (my !== seq) return;          // 古い結果は捨てる（切り替えを連打したとき）
+    state.results = data;
+    state.ran = sent;
+    state.logs = {};
+    renderResults();
+    setStatus(`${data.rows.length} 編成を計算しました（${data.elapsed_ms} ms）`);
+  } catch (e) {
+    if (my === seq) setStatus(failMessage(e), true);
+  }
+}
+
+function unitHtml(m) {
+  return `<div class="unit" title="${esc(m.name)} ${esc(m.badge)}"><div class="art">${artHtml(m.char_id, m.name, m.light_cone_id)}</div>` +
+         `<div class="badge">${esc(m.badge)}</div></div>`;
+}
+
+function renderResults() {
+  const root = $("#results");
+  const rows = (state.results && state.results.rows) || [];
+  if (!rows.length) { root.innerHTML = `<p class="hint">編成を追加すると、ここに比較が出ます</p>`; return; }
+  const palette = state.opts.palette;
+  /* 色はキャラに固定する。登場順に割り当て、行ごとに振り直さない */
+  const order = [];
+  rows.forEach((r) => Object.keys(r.breakdown).forEach((n) => { if (!order.includes(n)) order.push(n); }));
+  const slotOf = (n) => { const i = order.indexOf(n); return i >= 0 && i < palette.length ? i : -1; };
+  const base = rows[0].dpa || 1;
+  const top = Math.max(...rows.map((r) => r.total_damage)) || 1;
+  const s = state.results.settings;
+
+  const legend = order.slice(0, palette.length).map((n, i) =>
+    `<span class="key"><i style="background:${palette[i]}"></i>${esc(n)}</span>`).join("");
+  const body = rows.map((r, ri) => {
+    const segs = Object.entries(r.breakdown).filter(([, d]) => d > 0).sort((a, b) => b[1] - a[1]).map(([n, d]) => {
+      const i = slotOf(n);
+      const color = i >= 0 ? palette[i] : "var(--muted)";
+      const width = d / top * 100;
+      const share = r.total_damage ? d / r.total_damage : 0;
+      const perAv = r.dpa ? d / (r.total_damage / r.dpa) : 0;
+      const v = width >= 4.5 ? `<span class="v">${fmt(perAv)}</span>` : "";
+      return `<div class="seg" tabindex="0" style="width:${width.toFixed(4)}%;background:${color}">${v}` +
+             `<span class="tip">${esc(n)}<br>DPA ${fmt(perAv)} ／ ${(share * 100).toFixed(1)}%</span></div>`;
+    }).join("");
+    const notes = r.notes.length
+      ? `<details class="notes"><summary>未実装の効果 ${r.notes.length} 件（この編成の数字には入っていません）</summary><ul>` +
+        r.notes.map((n) => `<li>${esc(n)}</li>`).join("") + `</ul></details>` : "";
+    const msnote = (r.custom_notes || []).length
+      ? `<div class="msnote">テンプレから変更: ${r.custom_notes.map(esc).join(" ／ ")}</div>` : "";
+    return `<div class="row"><div><div class="rlabel">${esc(r.label)}</div><div class="units">${r.members.map(unitHtml).join("")}</div>${msnote}${notes}` +
+           `<button type="button" class="btn upgrade-btn" data-i="${ri}">この編成で凸を進める</button></div>` +
+           `<div class="track">${segs}</div>` +
+           `<div class="total"><b>${fmt(r.dpa)}</b><span class="pct">${(r.dpa / base * 100).toFixed(1)}%</span></div></div>` +
+           `<details class="battlelog" data-i="${ri}"${state.openLogs.has(ri) ? " open" : ""}><summary>戦闘ログ</summary><div class="logbody"></div></details>`;
+  }).join("");
+  const head = order.map((n) => `<th>${esc(n)}</th>`).join("");
+  const table = rows.map((r) => `<tr><th scope="row">${esc(r.label)}</th><td>${fmt(r.dpa)}</td><td>${fmt(r.total_damage)}</td>` +
+    `<td>${r.cycles.toFixed(2)}</td><td>${r.sp_balance >= 0 ? "+" : ""}${r.sp_balance.toFixed(1)}</td>` +
+    order.map((n) => `<td>${fmt(r.breakdown[n] || 0)}</td>`).join("") + `</tr>`).join("");
+
+  root.innerHTML =
+    `<p class="meta">敵 Lv${s.enemy_level} ／ ${s.enemies} 体 ／ 耐性 ${Math.round(s.enemy_res * 100)}% ／ ${s.cycles} サイクル ／ ` +
+    `${s.technique ? "秘技あり" : "秘技なし"}${s.enemy_attacks ? " ／ 敵の攻撃あり" : ""}</p>` +
+    `<p class="hint">数字は DPA（行動値あたりダメージ）。右の % は先頭の編成を 100% としたときの比。棒の各段にカーソルを乗せるとキャラごとの内訳が出ます</p>` +
+    `<div class="legend">${legend}</div><div class="wrap">${body}</div>` +
+    `<details class="table"><summary>数値で見る</summary><div class="wrap"><table><thead><tr><th scope="col">編成</th>` +
+    `<th>DPA</th><th>総ダメージ</th><th>サイクル</th><th>SP 収支</th>${head}</tr></thead><tbody>${table}</tbody></table></div></details>`;
+  root.querySelectorAll(".upgrade-btn").forEach((b) => {
+    b.addEventListener("click", () => openUpgrade(+b.dataset.i));
+  });
+  root.querySelectorAll("details.battlelog").forEach((d) => {
+    const i = +d.dataset.i;
+    d.addEventListener("toggle", () => {
+      if (d.open) { state.openLogs.add(i); loadLog(d, i); } else { state.openLogs.delete(i); }
+    });
+    if (d.open) loadLog(d, i);
+  });
+}
+
+/* ---------------- この編成で凸を進める ---------------- */
+
+/* 結果の行の編成（計算したときの形）を出発点にして、追加コスト別の候補を出す。
+   いまの編成をコスト 0 とし、1 凸・光円錐 1 重 = 1 コスト（開拓者は上げない） */
+function openUpgrade(i) {
+  if (!state.ran || !state.ran.teams[i]) return;
+  state.upgrade = {
+    team: JSON.parse(JSON.stringify(state.ran.teams[i])),
+    settings: { ...state.ran.settings },
+    label: state.results.rows[i].label,
+    maxExtra: (state.upgrade && state.upgrade.maxExtra) || 6,
+    data: null, error: "", token: 0,
+  };
+  const panel = $("#upgrade");
+  panel.hidden = false;
+  runUpgrade();
+  panel.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function runUpgrade() {
+  const up = state.upgrade;
+  const token = ++up.token;
+  up.data = null; up.error = "";
+  renderUpgrade();
+  try {
+    const data = await backend.call("upgrade", { team: up.team, settings: up.settings, max_extra: up.maxExtra });
+    if (state.upgrade !== up || up.token !== token) return;   /* 途中で選び直したら捨てる */
+    up.data = data;
+  } catch (e) {
+    if (state.upgrade !== up || up.token !== token) return;
+    up.error = failMessage(e);
+  }
+  renderUpgrade();
+}
+
+function renderUpgrade() {
+  const up = state.upgrade;
+  const panel = $("#upgrade");
+  if (!up) { panel.hidden = true; return; }
+  panel.innerHTML = "";
+  const head = el("div", "up-head");
+  const h = el("h2"); h.textContent = `凸を進める: ${up.label}`;
+  const limit = selectOf([3, 6, 10].map((v) => [v, `追加コスト ${v} まで`]), up.maxExtra, (v) => {
+    up.maxExtra = +v; runUpgrade();
+  }, "追加コストの上限");
+  const close = iconBtn("閉じる", "凸を進める候補を閉じる", () => { state.upgrade = null; renderUpgrade(); });
+  head.append(h, limit, close);
+  const hint = el("p", "hint");
+  hint.textContent = "いまの編成（凸・重ね・光円錐・メインステ・調整）をコスト 0 として、1 凸・光円錐 1 重 = 1 コストで数えます。" +
+    "モチーフ以外の光円錐は「モチーフに持ち替える」が 1 コスト。開拓者は上げません。" +
+    "コストごとに上位を残して広げた候補で、総当たりではありません。";
+  panel.append(head, hint);
+
+  if (up.error) { const p = el("p", "status error"); p.textContent = up.error; panel.append(p); return; }
+  if (!up.data) {
+    const p = el("p", "status");
+    p.textContent = `計算中…（追加コスト ${up.maxExtra} まで。1 コストごとに数十回戦うので、数秒〜数十秒かかります）`;
+    panel.append(p);
+    return;
+  }
+  const d = up.data;
+  const base = d.start.dpa || 1;
+  let html = `<div class="wrap"><table class="up"><thead><tr><th scope="col">追加コスト</th><th scope="col" class="c">候補</th>` +
+    `<th scope="col">DPA</th><th scope="col">伸び</th><th scope="col"></th></tr></thead><tbody>` +
+    `<tr class="first"><td>0</td><td class="c">いまの編成（${d.start.members.map((m) => esc(`${m.name} ${m.badge}`)).join("、")}）</td>` +
+    `<td>${fmt(d.start.dpa)}</td><td>—</td><td></td></tr>`;
+  d.rows.forEach((row) => {
+    if (!row.candidates.length) {
+      html += `<tr class="first"><td>+${row.cost}</td><td class="c" colspan="4">候補なし（上げられるキャラがいません）</td></tr>`;
+      return;
+    }
+    row.candidates.forEach((c, k) => {
+      const weak = k === 0 && !row.beats_cheaper
+        ? `<span class="weak">より安い候補のほうが DPA が高い</span>` : "";
+      html += `<tr class="${k === 0 ? "first top" : ""}">` +
+        (k === 0 ? `<td rowspan="${row.candidates.length}">+${row.cost}</td>` : "") +
+        `<td class="c">${c.changes.map((x) => `<span class="chg">${esc(x)}</span>`).join("")}${weak}</td>` +
+        `<td>${fmt(c.dpa)}</td><td>+${(c.gain * 100).toFixed(1)}%</td>` +
+        `<td><button type="button" class="icon up-add" data-cost="${row.cost}" data-k="${k}" title="この凸で編成を追加して、結果に並べる">編成に追加</button></td></tr>`;
+    });
+  });
+  html += `</tbody></table></div>`;
+  const wrap = el("div"); wrap.innerHTML = html;
+  panel.append(wrap);
+  panel.querySelectorAll(".up-add").forEach((b) => {
+    b.addEventListener("click", () => {
+      const row = d.rows.find((r) => r.cost === +b.dataset.cost);
+      const cand = row.candidates[+b.dataset.k];
+      const label = `${up.label} +${row.cost}（${cand.changes.join("・")}）`;
+      state.teams.push(...sanitize([{ label, members: cand.team }]));
+      renderTeams(); changed();
+      ioStatus(`「${label}」を編成に追加しました`);
+    });
+  });
+}
+
+/* ---------------- 戦闘ログ ---------------- */
+
+async function loadLog(d, i) {
+  const body = d.querySelector(".logbody");
+  if (state.logs[i]) { renderLog(body, state.logs[i]); return; }
+  if (!state.ran || !state.ran.teams[i]) return;
+  body.innerHTML = `<p class="hint">ログを取得中…</p>`;
+  try {
+    const data = await backend.call("log", { team: state.ran.teams[i], settings: state.ran.settings });
+    data.filter = data.filter || { text: "", actor: "", dmgOnly: false };
+    state.logs[i] = data;
+    renderLog(body, data);
+  } catch (e) {
+    body.innerHTML = `<p class="hint">${esc(failMessage(e))}</p>`;
+  }
+}
+
+function logLineText(ln) {
+  const d = ln.damage ? fmt(ln.damage).padStart(12) : " ".repeat(12);
+  return `[${ln.av.toFixed(1).padStart(7)}] C${ln.cycle} T${ln.turn} ${ln.actor.padEnd(10)} ${d}  ${ln.text}`;
+}
+
+function renderLog(body, data) {
+  const f = data.filter;
+  const actors = [...new Set(data.lines.map((ln) => ln.actor))];
+  body.innerHTML = "";
+  const ctl = el("div", "log-ctl");
+  const q = el("input"); q.type = "text"; q.value = f.text; q.placeholder = "絞り込み（例: 憶質、会心、敵1）";
+  q.setAttribute("aria-label", "ログを文字で絞り込む");
+  const who = selectOf([["", "全員"], ...actors.map((a) => [a, a])], f.actor, (v) => { f.actor = v; draw(); }, "行動者で絞り込む");
+  const dmg = el("input"); dmg.type = "checkbox"; dmg.checked = f.dmgOnly;
+  const dmgLabel = el("label", "field"); dmgLabel.append(dmg, document.createTextNode("ダメージ行だけ"));
+  const count = el("span", "sub");
+  const copy = el("button", "btn"); copy.type = "button"; copy.textContent = "表示中の行をテキストでコピー";
+  ctl.append(q, who, dmgLabel, copy, count);
+  const scroll = el("div", "log-scroll");
+  body.append(ctl, scroll);
+
+  let shown = [];
+  function draw() {
+    const needle = f.text.trim();
+    shown = data.lines.filter((ln) =>
+      (!f.actor || ln.actor === f.actor) && (!f.dmgOnly || ln.damage > 0) &&
+      (!needle || ln.text.includes(needle) || ln.actor.includes(needle)));
+    const turns = Object.fromEntries(data.turns.map((t) => [t.turn, t]));
+    let last = -1, html = "";
+    for (const ln of shown) {
+      if (ln.turn !== last) {
+        last = ln.turn;
+        const t = turns[ln.turn];
+        const head = ln.turn === 0 ? "戦闘開始前（装備・秘技）" : `ターン ${ln.turn}　${t ? t.actor : ""}　（行動値 ${t ? t.av.toFixed(1) : ln.av.toFixed(1)}）`;
+        html += `<tr class="turn"><td colspan="5">${esc(head)}</td></tr>`;
+      }
+      html += `<tr class="${ln.damage ? "dmg" : ""}"><td>${ln.av.toFixed(1)}</td><td>C${ln.cycle}</td>` +
+              `<td class="a">${esc(ln.actor)}</td><td class="d">${ln.damage ? fmt(ln.damage) : ""}</td><td class="t">${esc(ln.text)}</td></tr>`;
+    }
+    scroll.innerHTML = `<table class="log"><thead><tr><th scope="col">行動値</th><th scope="col">サイクル</th>` +
+      `<th scope="col">対象</th><th scope="col">ダメージ</th><th scope="col" class="t">内容</th></tr></thead><tbody>${html}</tbody></table>`;
+    const sum = shown.reduce((a, ln) => a + ln.damage, 0);
+    count.textContent = `${shown.length} / ${data.lines.length} 行 ／ 表示中のダメージ合計 ${fmt(sum)}`;
+  }
+  let typing = null;
+  q.addEventListener("input", () => { clearTimeout(typing); typing = setTimeout(() => { f.text = q.value; draw(); }, 150); });
+  dmg.addEventListener("change", () => { f.dmgOnly = dmg.checked; draw(); });
+  copy.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(shown.map(logLineText).join("\n"));
+      copy.textContent = `${shown.length} 行コピーしました`;
+    } catch (e) {
+      copy.textContent = "コピーできませんでした";
+    }
+    setTimeout(() => { copy.textContent = "表示中の行をテキストでコピー"; }, 2000);
+  });
+  draw();
+}
+
+/* ---------------- 保存・読み込み・共有 ---------------- */
+
+const FILE_FORMAT = "hsr-sim.teams";
+const FILE_VERSION = 1;
+
+function ioStatus(text, error) {
+  const s = $("#io-status"); s.textContent = text; s.classList.toggle("error", !!error);
+}
+
+function snapshot() {
+  const app = state.opts.app || {};
+  return { format: FILE_FORMAT, version: FILE_VERSION, app_version: app.version, data_version: app.data_version,
+           saved_at: new Date().toISOString(), settings: state.settings, teams: state.teams };
+}
+
+/* 読み込んだものを画面に入れる。形式が違うファイルは拒む。版が違えば数字が変わりうると知らせる */
+function applySnapshot(data, source) {
+  if (!data || (data.format && data.format !== FILE_FORMAT) || !Array.isArray(data.teams)) {
+    throw new Error("hsr-sim の保存ファイルではありません");
+  }
+  if ((data.version || 1) > FILE_VERSION) throw new Error("新しい版で保存されたファイルです。ページを更新してください");
+  state.settings = Object.assign({}, state.opts.defaults, data.settings || {});
+  state.teams = sanitize(data.teams);
+  state.openAdj.clear();
+  renderSettings(); renderTeams(); changed();
+  const app = state.opts.app || {};
+  const note = data.data_version && data.data_version !== app.data_version
+    ? `（保存時のゲームデータ ${data.data_version} と今の ${app.data_version} が違うので、数字が変わることがあります）` : "";
+  ioStatus(`${source}を読み込みました${note}`);
+}
+
+function saveFile() {
+  const blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  const d = new Date();
+  const stamp = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}_${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}`;
+  a.href = URL.createObjectURL(blob);
+  a.download = `hsr-sim_${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  ioStatus(`${a.download} を保存しました`);
+}
+
+async function loadFile(ev) {
+  const file = ev.target.files && ev.target.files[0];
+  ev.target.value = "";
+  if (!file) return;
+  try {
+    applySnapshot(JSON.parse(await file.text()), `「${file.name}」`);
+  } catch (e) {
+    ioStatus(`読み込めませんでした: ${e.message}`, true);
+  }
+}
+
+/* 共有リンク: 編成と条件を圧縮して # の後ろに入れる（サーバーには送られない） */
+function toBase64Url(bytes) {
+  let bin = ""; bytes.forEach((b) => { bin += String.fromCharCode(b); });
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function fromBase64Url(text) {
+  const bin = atob(text.replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(bin, (c) => c.charCodeAt(0));
+}
+async function pipe(bytes, stream) {
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+}
+async function copyShareLink() {
+  const { settings, teams } = snapshot();
+  const json = new TextEncoder().encode(JSON.stringify({ v: FILE_VERSION, settings, teams }));
+  let hash;
+  if (typeof CompressionStream === "function") hash = "#z=" + toBase64Url(await pipe(json, new CompressionStream("deflate-raw")));
+  else hash = "#j=" + toBase64Url(json);
+  const url = location.href.split("#")[0] + hash;
+  try {
+    await navigator.clipboard.writeText(url);
+    ioStatus("共有リンクをコピーしました");
+  } catch (e) {
+    window.prompt("このリンクをコピーしてください", url);
+  }
+}
+async function readShareHash() {
+  const m = location.hash.match(/^#([zj])=([A-Za-z0-9_-]+)$/);
+  if (!m) return null;
+  let bytes = fromBase64Url(m[2]);
+  if (m[1] === "z") bytes = await pipe(bytes, new DecompressionStream("deflate-raw"));
+  const data = JSON.parse(new TextDecoder().decode(bytes));
+  return { format: FILE_FORMAT, version: data.v, settings: data.settings, teams: data.teams };
+}
+
+async function exportImage() {
+  const st = $("#export-status");
+  st.classList.remove("error");
+  st.textContent = "書き出し中…（画像はアイコンの読み込みを待つので数秒かかります）";
+  try {
+    const data = await backend.call("export", { teams: state.teams, settings: state.settings, title: $("#title").value });
+    st.textContent = data.png ? `書き出しました: ${data.png}` : `HTML だけ書き出しました: ${data.html}（画像: ${data.png_error}）`;
+  } catch (e) {
+    st.textContent = failMessage(e); st.classList.add("error");
+  }
+}
+
+init();
+</script>
+</body></html>
