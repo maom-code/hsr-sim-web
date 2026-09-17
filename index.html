@@ -372,7 +372,8 @@ async function init() {
     ioStatus("共有リンクの編成を読み込みました");
   }
   const app = state.opts.app || {};
-  $("#app-foot-ver").textContent = `hsr-sim ${app.version || ""} ／ ゲームデータ ${app.data_version || ""}` +
+  $("#app-foot-ver").textContent =
+    `hsr-sim ${app.version || ""} ／ ゲームデータ ${app.data_version_short || app.data_version || ""}` +
     (backend.kind === "server" ? "" : " ／ 計算はこのブラウザの中で行っています");
   if (backend.kind !== "server") $("#export-box").hidden = true;   /* 画像の書き出しはローカル版だけ */
   /* 弱点撃破の但し書きは試験機能を出しているときだけ */
