@@ -92,6 +92,13 @@
   .total b { font-size: 17px; display: block; }
   .total .pct { font-size: 11px; color: var(--text-secondary); }
   .msnote { margin: 4px 0 0; font-size: 11px; color: var(--text-secondary); }
+  .gear { margin: 6px 0 0; font-size: 12px; color: var(--text-secondary); }
+  .gear summary { cursor: pointer; color: var(--muted); }
+  .gear table { border-collapse: collapse; margin-top: 4px; }
+  .gear td { padding: 1px 10px 1px 0; white-space: nowrap; }
+  .gear td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .gear .who { font-weight: 700; padding-top: 4px; }
+  .gear .sets { color: var(--muted); }
   .notes { margin: 6px 0 0; font-size: 12px; color: var(--danger); }
   .notes summary { cursor: pointer; }
   .notes ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-secondary); }
@@ -698,9 +705,23 @@ function renderResults() {
     const notes = r.notes.length
       ? `<details class="notes"><summary>未実装の効果 ${r.notes.length} 件（この編成の数字には入っていません）</summary><ul>` +
         r.notes.map((n) => `<li>${esc(n)}</li>`).join("") + `</ul></details>` : "";
+    /* 遺物とサブステの伸び（表示だけ。2026-09-18 ユーザー指定） */
+    const gear = (r.gear || []).length
+      ? `<details class="gear"><summary>遺物とサブステ</summary>` +
+        r.gear.map((g, gi) => {
+          const who = (r.members[gi] || {}).name || "";
+          const sets = (g.sets || []).map((x) => `${esc(x.name)} ${x.count}`).join(" ／ ");
+          const subs = (g.substats || []).map((x) =>
+            `<tr><td>${esc(x.label)}</td><td class="num">${x.percent ? (x.value * 100).toFixed(1) + "%" : x.value.toFixed(0)}</td>` +
+            `<td class="num">${x.rolls} 回</td></tr>`).join("");
+          return `<div class="who">${esc(who)}</div><div class="sets">${sets}</div>` +
+                 `<table>${subs}</table>`;
+        }).join("") +
+        `<div class="sets">サブステは 30 回の成長をキャラごとの優先度で振った結果です</div></details>`
+      : "";
     const msnote = (r.custom_notes || []).length
       ? `<div class="msnote">テンプレから変更: ${r.custom_notes.map(esc).join(" ／ ")}</div>` : "";
-    return `<div class="row"><div><div class="rlabel">${esc(r.label)}</div><div class="units">${r.members.map(unitHtml).join("")}</div>${msnote}${notes}` +
+    return `<div class="row"><div><div class="rlabel">${esc(r.label)}</div><div class="units">${r.members.map(unitHtml).join("")}</div>${msnote}${gear}${notes}` +
            `<button type="button" class="btn upgrade-btn" data-i="${ri}">この編成で凸を進める</button></div>` +
            `<div class="track">${segs}</div>` +
            `<div class="total"><b>${fmt(r.dpa)}</b><span class="pct">${(r.dpa / base * 100).toFixed(1)}%</span></div></div>` +
