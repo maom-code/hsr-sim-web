@@ -1,7 +1,11 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>hsr-sim 編成くらべ</title>
+<title>崩壊スターレイル DPAシミュレータ（β版）</title>
+<meta name="description" content="崩壊スターレイル（スターレイル）の非公式ダメージ計算ツール。編成・凸・光円錐・遺物のメインステを選ぶと、DPA（行動値あたりダメージ）を計算して編成ごとに比べられます。ブラウザだけで動きます。">
+<meta property="og:title" content="崩壊スターレイル DPAシミュレータ（β版）">
+<meta property="og:description" content="編成ごとのダメージ計算を、ブラウザの中だけで。凸・光円錐・遺物のメインステを変えて DPA を比べられます。">
+<meta property="og:type" content="website">
 <style>
   /* 白背景・黒文字に固定（`hsr chart` と同じ。見比べる用途なので環境で変えない）。
      配色は data-viz の既定カテゴリカルパレット（report.py と同じ並び） */
@@ -20,6 +24,8 @@
   h1 { font-size: 19px; margin: 0; }
   h2 { font-size: 15px; margin: 0; }
   .sub { color: var(--muted); font-size: 12px; }
+  .beta { margin-left: 6px; padding: 1px 6px; border-radius: 999px; font-size: 11px;
+          vertical-align: middle; background: var(--surface-2); color: var(--muted); }
 
   .settings { display: flex; flex-wrap: wrap; gap: 10px 20px; align-items: center;
               padding: 10px 14px; background: var(--surface-2); border-radius: 10px; margin: 0 0 18px; }
@@ -169,8 +175,8 @@
 <body>
 <div class="app">
   <header>
-    <h1>hsr-sim 編成くらべ</h1>
-    <span class="sub">キャラ・凸・光円錐・敵の数を切り替えると、その場で計算し直します</span>
+    <h1>崩壊スターレイル DPAシミュレータ<span class="beta">β版</span></h1>
+    <span class="sub">編成のダメージ計算ツール。キャラ・凸・光円錐・敵の数を切り替えると、その場で計算し直します</span>
   </header>
 
   <div class="settings" id="settings" aria-label="戦闘の条件"></div>
@@ -381,7 +387,7 @@ async function init() {
   const app = state.opts.app || {};
   const ver = $("#app-foot-ver");
   ver.textContent =
-    `編成くらべ v${app.version || ""} ／ ゲームデータ ${app.data_version_short || app.data_version || ""}` +
+    `DPAシミュレータ v${app.version || ""} ／ ゲームデータ ${app.data_version_short || app.data_version || ""}` +
     (backend.kind === "server" ? "" : " ／ 計算はこのブラウザの中で行っています");
   /* ビルドの識別子は表に出さず、問い合わせ用に title だけに入れる */
   if (app.build) ver.title = `build ${app.build}`;
