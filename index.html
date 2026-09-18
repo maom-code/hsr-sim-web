@@ -354,6 +354,8 @@ function sanitize(teams) {
         })),
         /* ローテはそのキャラで選べるものだけ。古い保存データは既定に戻す */
         rot: c.rotations.some(([v]) => v === (m && m.rot)) ? m.rot : "auto",
+        /* 「誰かを選んで〜する」効果の対象。存在しないキャラ ID を指していたら既定に戻す */
+        adv: (m && m.adv && t.members.some((o) => o.id === m.adv)) ? m.adv : null,
         /* 必殺技の撃ち方。温存を選べないキャラや古い保存データは既定に戻す */
         ult: c.ults.some(([v]) => v === (m && m.ult)) ? m.ult : "asap",
         /* 遺物構成。選べないキャラや古い保存データは既定（先頭）に戻す */
@@ -618,6 +620,20 @@ function slot(t, m, mi) {
   const gearLabel = el("div", "gear-label");
   gearLabel.textContent = gearText();
   gearLabel.title = "今装備している遺物セット(4個+2個)";
+  /* 「誰かを選んで〜する」効果の対象。選択肢は今の編成の他のメンバーなので毎回作り直す
+     （水着ロビンの「スペシャルゲスト」など。2026-09-19 ユーザー指定） */
+  const advChoices = c.advance_target_label
+    ? t.members.filter((_, oi) => oi !== mi)
+        .map((o) => [o.id, (charById(o.id) || {}).name || o.id])
+    : [];
+  const advSel = advChoices.length ? selectOf([["", "既定"], ...advChoices], m.adv || "", (v) => {
+    m.adv = v || null; advSel.classList.toggle("changed", !!v); changed();
+  }, `${c.name}の${c.advance_target_label}の対象`) : null;
+  if (advSel) {
+    advSel.classList.add("rot");
+    advSel.classList.toggle("changed", !!m.adv);
+    advSel.title = `「${c.advance_target_label}」を付ける相手（既定は編成ごとの優先順）`;
+  }
   const key = `${state.teams.indexOf(t)}-${mi}`;
   const toggle = el("button", "btn adj-toggle"); toggle.type = "button";
   const panel = el("div", "adj"); panel.hidden = !state.openAdj.has(key);
@@ -638,6 +654,7 @@ function slot(t, m, mi) {
   if (ultSel) fields.append(ultSel);
   if (relicSel) fields.append(relicSel);
   fields.append(ornSel, gearLabel);
+  if (advSel) fields.append(advSel);
   fields.append(toggle, panel);
   wrap.append(art, fields);
   if (!panel.hidden) fillAdj(panel, m, label);
