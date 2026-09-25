@@ -108,6 +108,7 @@
   .notes { margin: 6px 0 0; font-size: 12px; color: var(--danger); }
   .notes summary { cursor: pointer; }
   .notes ul { margin: 4px 0 0; padding-left: 18px; color: var(--text-secondary); }
+  .notes.play { color: var(--text-secondary); }
   details.table { margin-top: 18px; }
   details.table summary { cursor: pointer; color: var(--text-secondary); font-size: 13px; }
   table { border-collapse: collapse; margin-top: 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
@@ -170,6 +171,39 @@
   .export { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 16px 0 0; }
   .export input { width: 220px; }
 
+  /* キャラ選択（2026-09-25）。キャラが増えたので select をやめ、運命ごとのモーダルにした */
+  .slot .art { cursor: pointer; }
+  .slot .art:hover { outline: 2px solid #000; outline-offset: 1px; }
+  button.pick { width: 100%; font: inherit; font-weight: 600; text-align: left; cursor: pointer;
+                padding: 4px 22px 4px 6px; border: 1px solid var(--line); border-radius: 6px;
+                background: var(--surface-1) no-repeat right 7px center / 9px
+                  url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%233d3c3a'/%3E%3C/svg%3E");
+                color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  button.pick:hover { border-color: #000; }
+  dialog.picker { width: min(760px, calc(100vw - 32px)); max-height: min(82vh, 900px); padding: 0;
+                  border: 1px solid var(--line); border-radius: 12px; background: var(--surface-1);
+                  color: var(--text-primary); box-shadow: 0 12px 40px rgba(0, 0, 0, .18); }
+  dialog.picker::backdrop { background: rgba(0, 0, 0, .35); }
+  .picker-head { position: sticky; top: 0; z-index: 3; display: flex; gap: 8px; align-items: center;
+                 padding: 12px 14px; background: var(--surface-1); border-bottom: 1px solid var(--line); }
+  .picker-head h2 { flex: none; }
+  .picker-head input { flex: 1; min-width: 0; }
+  .picker-body { padding: 4px 14px 16px; }
+  .picker-group h3 { font-size: 13px; margin: 14px 0 6px; color: var(--text-secondary);
+                     display: flex; align-items: baseline; gap: 6px; }
+  .picker-group h3 .n { font-weight: 400; color: var(--muted); font-size: 12px; }
+  .picker-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 8px; }
+  button.tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 4px 7px;
+                border: 1px solid var(--line); border-radius: 10px; background: var(--surface-1);
+                cursor: pointer; font: inherit; color: inherit; position: relative; }
+  button.tile:hover, button.tile:focus-visible { border-color: #000; background: var(--surface-2); outline: none; }
+  button.tile.current { border: 2px solid #000; padding: 5px 3px 6px; }
+  button.tile .art { width: 60px; height: 60px; border-radius: 50%; cursor: inherit; }
+  button.tile .art:hover { outline: none; }
+  button.tile .name { font-size: 12px; line-height: 1.3; text-align: center; word-break: break-all; }
+  button.tile .tag { position: absolute; top: 4px; right: 4px; font-size: 10px; line-height: 1;
+                     padding: 2px 4px; border-radius: 4px; background: #000; color: #fff; }
+  .picker-empty { color: var(--muted); padding: 18px 0; }
   @media (max-width: 980px) {
     .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .row { grid-template-columns: minmax(0, 1fr) 100px; }
@@ -226,6 +260,22 @@
       <li><b>敵はデバフを撒きません。</b> デバフ解除や効果抵抗を持つキャラは、そのぶんが効きません</li>
       <li>味方は戦闘不能になりません。復活や「HP が 0 になっても倒れない」も効きません</li>
       <li>会心は期待値で計算しています（乱数を振らず、会心率 × 会心ダメージで均します）</li>
+      <li><b>必殺技や固有の行動はオートの決め打ちです。</b> 必殺技は溜まり次第すぐ撃ち、
+        連携攻撃や強化スキルも条件を満たした時点で使います。実戦で順番を調整するキャラ
+        （緋英・セイバー・ギルガメッシュ・アーチャー・遠坂凛・ファイノンなど）は、手動のほうが
+        高く出ることがあり、凸を上げると DPA が下がって見えることもあります。
+        該当するキャラは結果の行に注記が出ます</li>
+      <li><b>近似で入れているところがあります。</b>
+        姫子・旅立ちの必殺技は説明文の合計倍率（主対象 762%・その他 252%）で撃ち、天賦の耐性貫通・
+        会心ダメージは常時扱いです。ファイノンの「災厄・魂命の滅却」は敵を実際には行動させず、
+        敵の数ぶんの熾炎でカウンターします（カスライナの行動は「壊傷 4 以上なら天裁、それ以外は滅却」の決め打ち）。
+        ルアン・メェイの星魂 2 は「撃破中の敵がいる間ずっと」、アーチャーの星魂 2 は全属性の耐性ダウンで置いています。
+        パールは実装が部分的です（未実装の効果は結果の行に出ます）</li>
+      <li><b>バリアは付与したことだけを記録します。</b> 耐久値で被ダメージを吸収する計算はしません
+        （「バリアを持つ味方の〜」系の効果は入ります）</li>
+      <li><b>狙いは真ん中の敵に揃えています。</b> 単体・拡散とも、敵の並びの真ん中を狙います</li>
+      <li><b>選べるのは実装済みのキャラだけです。</b> まだ入っていないキャラ（元の刃・カフカ・鏡流など）は
+        選択肢に出ません。アッパー調整のあるキャラは調整後の性能で計算しています</li>
       <li id="caveat-break" hidden><b>弱点撃破は試験中です。</b>
         敵 3 体は同じ靭性・全属性弱点で揃えています。撃破の行動遅延は 25% 固定、
         「弱点撃破状態の敵に会心率アップ」は<b>撃破中の敵が 1 体でもいる間ずっと</b>
@@ -320,6 +370,67 @@ function esc(s) {
 }
 function fmt(v) { return Math.round(v).toLocaleString("ja-JP"); }
 function shortName(n) { return n.replace("開拓者・", "").slice(0, 4); }
+
+/* 運命の表示順と表示名（データの内部名 -> 日本語） */
+const PATHS = [["Warrior", "壊滅"], ["Rogue", "巡狩"], ["Mage", "知恵"], ["Shaman", "調和"],
+               ["Warlock", "虚無"], ["Knight", "存護"], ["Priest", "豊穣"], ["Memory", "記憶"],
+               ["Elation", "愉悦"]];
+
+/* キャラ選択のモーダル。`taken` は同じ編成の他のメンバー（「編成中」の印を付けるだけで選べる） */
+function openPicker(current, taken, onPick, title) {
+  const dlg = $("#picker");
+  dlg.innerHTML = "";
+  const head = el("div", "picker-head");
+  const h = el("h2"); h.textContent = title || "キャラを選ぶ";
+  const q = el("input"); q.type = "text"; q.placeholder = "名前で絞り込む";
+  q.setAttribute("aria-label", "名前で絞り込む");
+  const close = iconBtn("閉じる", "閉じる（Esc）", () => dlg.close());
+  head.append(h, q, close);
+  const body = el("div", "picker-body");
+  const tiles = [];
+  const known = new Set(PATHS.map(([k]) => k));
+  const groups = [...PATHS, ...[...new Set(state.opts.characters.map((c) => c.path))]
+    .filter((p) => !known.has(p)).map((p) => [p, p])];
+  groups.forEach(([key, label]) => {
+    const chars = state.opts.characters.filter((c) => c.path === key);
+    if (!chars.length) return;
+    const g = el("section", "picker-group");
+    const h3 = el("h3");
+    h3.innerHTML = `${esc(label)}<span class="n">${chars.length}</span>`;
+    const grid = el("div", "picker-grid");
+    chars.forEach((c) => {
+      const b = el("button", "tile" + (c.id === String(current) ? " current" : ""));
+      b.type = "button"; b.title = c.name;
+      const art = el("div", "art"); art.innerHTML = artHtml(c.id, c.name, null);
+      const name = el("div", "name"); name.textContent = c.name;
+      b.append(art, name);
+      if (taken.includes(c.id)) {
+        const tag = el("span", "tag"); tag.textContent = "編成中"; b.appendChild(tag);
+      }
+      b.addEventListener("click", () => { dlg.close(); onPick(c.id); });
+      grid.appendChild(b);
+      tiles.push([b, g, c.name]);
+    });
+    g.append(h3, grid);
+    body.appendChild(g);
+  });
+  const empty = el("p", "picker-empty"); empty.textContent = "該当するキャラがいません"; empty.hidden = true;
+  body.appendChild(empty);
+  q.addEventListener("input", () => {
+    const word = q.value.trim();
+    tiles.forEach(([b, , name]) => { b.hidden = !!word && !name.includes(word); });
+    body.querySelectorAll(".picker-group").forEach((g) => {
+      g.hidden = ![...g.querySelectorAll("button.tile")].some((b) => !b.hidden);
+    });
+    empty.hidden = tiles.some(([b]) => !b.hidden);
+  });
+  dlg.append(head, body);
+  /* 背景（モーダルの外側）を押したら閉じる */
+  dlg.onclick = (ev) => { if (ev.target === dlg) dlg.close(); };
+  dlg.showModal();
+  const cur = body.querySelector("button.tile.current");
+  if (cur) { cur.focus(); cur.scrollIntoView({ block: "center" }); } else { q.focus(); }
+}
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
 
 function save() {
@@ -368,6 +479,8 @@ function sanitize(teams) {
         ult: c.ults.some(([v]) => v === (m && m.ult)) ? m.ult : "asap",
         /* 遺物構成。選べないキャラや古い保存データは既定（先頭）に戻す */
         relic: c.relics.length ? (c.relics.some(([v]) => v === (m && m.relic)) ? m.relic : c.relics[0][0]) : null,
+        /* キャラ固有のモード（姫子・旅立ちの同行協定）。選べないキャラや古い保存データは既定（先頭） */
+        mode: (c.modes || []).length ? (c.modes.some(([v]) => v === (m && m.mode)) ? m.mode : c.modes[0][0]) : null,
         /* オーナメント。全キャラ共通で選べる。古い保存データは既定に戻す */
         orn: c.ornaments.some(([v]) => v === (m && m.orn)) ? m.orn : "default",
         /* 手動調整は知っている項目の数字だけ残す（キャラに無い項目はサーバーが弾く） */
@@ -474,7 +587,7 @@ function renderSettings() {
   root.innerHTML = "";
   const wrap = (label, ctl) => { const f = el("div", "field"); const t = el("span"); t.textContent = label; f.append(t, ctl); return f; };
   root.append(
-    wrap("敵の数", segmented([1, 2, 3], s.enemies, (v) => { s.enemies = v; }, (v) => `${v} 体`)),
+    wrap("敵の数", segmented([1, 2, 3, 4, 5], s.enemies, (v) => { s.enemies = v; }, (v) => `${v} 体`)),
     field("敵 Lv", selectOf([[90, "90"], [95, "95"]], s.enemy_level, (v) => { s.enemy_level = +v; changed(); }, "敵のレベル")),
     field("敵の耐性", selectOf([[0.2, "20%（通常）"], [0, "0%（弱点）"]], s.enemy_res, (v) => { s.enemy_res = +v; changed(); }, "敵の耐性")),
     field("サイクル", selectOf([[1, "1"], [2, "2"], [3, "3"], [5, "5"]], s.cycles, (v) => { s.cycles = +v; changed(); }, "サイクル数")),
@@ -552,10 +665,18 @@ function slot(t, m, mi) {
   art.innerHTML = artHtml(c.id, c.name, m.lc);
   art.title = c.name;
   const fields = el("div", "fields");
-  const who = selectOf(state.opts.characters.map((x) => [x.id, x.name]), m.id, (v) => {
+  /* キャラ選択はモーダル（運命ごと + 画像 + 名前）。アイコンを押しても開く */
+  const pickChar = () => openPicker(m.id, t.members.filter((_, oi) => oi !== mi).map((o) => o.id), (v) => {
+    if (v === m.id) return;
     t.members[mi] = newMember(v);
     renderTeams(); changed();
   }, `${mi + 1} 人目のキャラ`);
+  const who = el("button", "pick"); who.type = "button";
+  who.textContent = c.name;
+  who.title = `${mi + 1} 人目のキャラを選び直す`;
+  who.setAttribute("aria-haspopup", "dialog");
+  who.addEventListener("click", pickChar);
+  art.addEventListener("click", pickChar);
   const es = el("div", "es");
   /* 手動調整の欄が開いていたら、凸・重ね・メインステを変えたときに「元の値」を取り直す */
   let refreshAdj = () => {};
@@ -608,6 +729,15 @@ function slot(t, m, mi) {
     relicSel.classList.toggle("changed", (m.relic || relicDefault) !== relicDefault);
     relicSel.title = "遺物セットの組み合わせ";
   }
+  const modeDefault = (c.modes || []).length ? c.modes[0][0] : null;
+  const modeSel = (c.modes || []).length > 1 ? selectOf(c.modes, m.mode || modeDefault, (v) => {
+    m.mode = v; modeSel.classList.toggle("changed", v !== modeDefault); changed();
+  }, `${c.name}の${c.mode_label || "モード"}`) : null;
+  if (modeSel) {
+    modeSel.classList.add("rot");
+    modeSel.classList.toggle("changed", (m.mode || modeDefault) !== modeDefault);
+    modeSel.title = c.mode_label || "モード";
+  }
   const ornSel = selectOf(c.ornaments, m.orn || "default", (v) => {
     m.orn = v; ornSel.classList.toggle("changed", v !== "default");
     gearLabel.textContent = gearText();
@@ -639,13 +769,16 @@ function slot(t, m, mi) {
   if (advChoices.length) {
     const priority = c.advance_target_priority || [];
     const hit = priority.find((id) => advChoices.some(([v]) => v === id));
-    const autoName = (advChoices.find(([v]) => v === hit) || advChoices[0])[1];
+    const autoName = c.advance_target_default
+      || (advChoices.find(([v]) => v === hit) || advChoices[0])[1];
     advSel = selectOf([["", `既定（${autoName}）`], ...advChoices], m.adv || "", (v) => {
       m.adv = v || null; advSel.classList.toggle("changed", !!v); changed();
     }, `${c.name}の${c.advance_target_label}`);
     advSel.classList.add("rot");
     advSel.classList.toggle("changed", !!m.adv);
-    advSel.title = priority.length
+    advSel.title = c.advance_target_default
+      ? `${c.advance_target_label}。既定は「${c.advance_target_default}」`
+      : priority.length
       ? `${c.advance_target_label}。既定は「${autoName}」（優先する相手が編成にいなければ自分以外の先頭）`
       : `${c.advance_target_label}。既定は編成の自分以外の先頭（いまは「${autoName}」）`;
     advField = el("div", "field");
@@ -682,6 +815,7 @@ function slot(t, m, mi) {
   fields.append(who, es, lc, ms, rot);
   if (ultSel) fields.append(ultSel);
   if (relicSel) fields.append(relicSel);
+  if (modeSel) fields.append(modeSel);
   fields.append(ornSel, gearLabel);
   if (advField) fields.append(advField);
   if (techField) fields.append(techField);
@@ -796,6 +930,10 @@ function renderResults() {
     const notes = r.notes.length
       ? `<details class="notes"><summary>未実装の効果 ${r.notes.length} 件（この編成の数字には入っていません）</summary><ul>` +
         r.notes.map((n) => `<li>${esc(n)}</li>`).join("") + `</ul></details>` : "";
+    /* オートと手動で差が出やすいキャラの但し書き（2026-09-25 ユーザー指定） */
+    const play = (r.play_notes || []).length
+      ? `<details class="notes play"><summary>手動で動かすと数字が変わりやすいキャラがいます（${r.play_notes.length} 人）</summary><ul>` +
+        r.play_notes.map((n) => `<li>${esc(n)}</li>`).join("") + `</ul></details>` : "";
     /* 遺物とサブステの伸び（表示だけ。2026-09-18 ユーザー指定） */
     const gear = (r.gear || []).length
       ? `<details class="gear"><summary>遺物とサブステ</summary>` +
@@ -812,7 +950,7 @@ function renderResults() {
       : "";
     const msnote = (r.custom_notes || []).length
       ? `<div class="msnote">テンプレから変更: ${r.custom_notes.map(esc).join(" ／ ")}</div>` : "";
-    return `<div class="row"><div><div class="rlabel">${esc(r.label)}</div><div class="units">${r.members.map(unitHtml).join("")}</div>${msnote}${gear}${notes}` +
+    return `<div class="row"><div><div class="rlabel">${esc(r.label)}</div><div class="units">${r.members.map(unitHtml).join("")}</div>${msnote}${gear}${notes}${play}` +
            `<button type="button" class="btn upgrade-btn" data-i="${ri}">この編成で凸を進める</button></div>` +
            `<div class="track">${segs}</div>` +
            `<div class="total"><b>${fmt(r.dpa)}</b><span class="pct">${(r.dpa / base * 100).toFixed(1)}%</span></div></div>` +
@@ -1118,4 +1256,5 @@ async function exportImage() {
 
 init();
 </script>
+<dialog id="picker" class="picker" aria-label="キャラを選ぶ"></dialog>
 </body></html>
