@@ -301,7 +301,7 @@
 <script>
 /* 静的サイト版: 計算はこのブラウザの中（Web Worker 上の Python）で行う */
 window.HSR_BACKEND = (() => {
-  const worker = new Worker("worker.js", { type: "module" });
+  const worker = new Worker("worker.js?v=61b0682002e8", { type: "module" });
   const pending = new Map();
   let next = 0;
   worker.onmessage = (ev) => {

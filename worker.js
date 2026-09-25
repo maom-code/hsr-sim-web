@@ -4,7 +4,7 @@ import { loadPyodide } from "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyod
 let dispatch = null;
 const ready = (async () => {
   const pyodide = await loadPyodide({ indexURL: "https://cdn.jsdelivr.net/pyodide/v314.0.7/full/" });
-  const res = await fetch("hsr-bundle.zip");
+  const res = await fetch("hsr-bundle.zip?v=61b0682002e8");
   if (!res.ok) throw new Error("hsr-bundle.zip が取れません (" + res.status + ")");
   pyodide.unpackArchive(await res.arrayBuffer(), "zip", { extractDir: "/home/pyodide/hsr-sim" });
   dispatch = pyodide.runPython(`
