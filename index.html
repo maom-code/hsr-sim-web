@@ -204,6 +204,33 @@
   button.tile .tag { position: absolute; top: 4px; right: 4px; font-size: 10px; line-height: 1;
                      padding: 2px 4px; border-radius: 4px; background: #000; color: #fff; }
   .picker-empty { color: var(--muted); padding: 18px 0; }
+  /* 遺物セットの選択（2026-09-27）。カードのボタンとモーダル */
+  .slot .fields .relics { display: grid; grid-template-columns: 1fr; gap: 4px; min-width: 0; }
+  button.relic-pick { display: flex; align-items: center; gap: 6px; font-weight: 400; font-size: 12px;
+                      padding: 3px 22px 3px 4px; }
+  button.relic-pick.changed { border-color: #000; font-weight: 600; }
+  button.relic-pick .k { flex: none; font-size: 10px; color: var(--muted); }
+  button.relic-pick .nm { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  button.relic-pick .warn, .relic-detail .warn { flex: none; font-size: 10px; color: var(--danger); }
+  .relic-art { position: relative; flex: none; display: inline-block; width: 24px; height: 24px;
+               border-radius: 5px; background: var(--surface-2); overflow: hidden; }
+  .relic-art img { position: relative; z-index: 1; width: 100%; height: 100%; object-fit: contain; display: block; }
+  .relic-art .fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+                         font-size: 9px; color: var(--muted); }
+  button.tile.relic .art { border-radius: 12px; background: var(--surface-2); }
+  button.tile.relic .art .relic-art { width: 100%; height: 100%; background: none; }
+  button.tile.relic .art .relic-art .fallback { font-size: 13px; }
+  button.tile.relic.missing { cursor: not-allowed; opacity: .5; }
+  button.tile.relic.missing:hover { border-color: var(--line); background: var(--surface-1); }
+  button.tile .tag.warn { background: var(--danger); }
+  .relic-detail { position: sticky; bottom: 0; z-index: 3; padding: 10px 14px 12px; min-height: 92px;
+                  background: var(--surface-1); border-top: 1px solid var(--line); font-size: 12px; }
+  .relic-detail .dh { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .relic-detail .dh .relic-art { width: 32px; height: 32px; }
+  .relic-detail p { margin: 3px 0; color: var(--text-secondary); line-height: 1.5; }
+  .relic-detail .n { display: inline-block; min-width: 4.2em; color: var(--muted); }
+  .relic-detail .badge { font-size: 10px; padding: 1px 5px; border-radius: 4px; background: #000; color: #fff; }
+  .relic-detail .hint { color: var(--muted); margin: 0; }
   @media (max-width: 980px) {
     .slots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .row { grid-template-columns: minmax(0, 1fr) 100px; }
@@ -252,11 +279,12 @@
   <details class="caveats">
     <summary>この計算でやっていないこと</summary>
     <ul>
-      <li><b>敵は倒れません。</b> HP を高くして殴り続けるので、弱点撃破・撃破ダメージ・超撃破は入れていません。
-        「敵を倒したら〜」「弱点撃破したら〜」で伸びるキャラ（不死途の撃破連鎖、長夜月の星魂 4、
-        キャストリスの星魂 6 など）は、そのぶん低く出ます</li>
-      <li><b>敵は既定では攻撃してきません。</b> 被弾で増える EP や、挑発・被ダメージ軽減・
-        バリア・治癒の価値は数字に出ません（「敵の攻撃」を入にすると一部は入ります）</li>
+      <li><b>敵は倒れません。</b> HP を高くして殴り続けます。「敵を倒したら〜」で伸びるキャラ
+        （不死途の撃破連鎖、長夜月の星魂 4、キャストリスの星魂 6 など）は、そのぶん低く出ます。
+        弱点撃破は既定では扱いません（「弱点撃破」を入にすると入ります）</li>
+      <li><b>敵は既定では攻撃してきません。</b>「敵が攻撃する」を入にすると、敵のターンに挑発値が
+        いちばん高い味方を<b>1 ダメージ</b>で殴ります。反撃や「攻撃を受けた時」の効果（千冶・刃のチャージなど）は
+        これで動きますが、被ダメージ軽減・バリアの吸収・治癒の価値は数字に出ません</li>
       <li><b>敵はデバフを撒きません。</b> デバフ解除や効果抵抗を持つキャラは、そのぶんが効きません</li>
       <li>味方は戦闘不能になりません。復活や「HP が 0 になっても倒れない」も効きません</li>
       <li>会心は期待値で計算しています（乱数を振らず、会心率 × 会心ダメージで均します）</li>
@@ -269,19 +297,34 @@
         姫子・旅立ちの必殺技は説明文の合計倍率（主対象 762%・その他 252%）で撃ち、天賦の耐性貫通・
         会心ダメージは常時扱いです。ファイノンの「災厄・魂命の滅却」は敵を実際には行動させず、
         敵の数ぶんの熾炎でカウンターします（カスライナの行動は「壊傷 4 以上なら天裁、それ以外は滅却」の決め打ち）。
-        ルアン・メェイの星魂 2 は「撃破中の敵がいる間ずっと」、アーチャーの星魂 2 は全属性の耐性ダウンで置いています。
+        アーチャーの星魂 2 は全属性の耐性ダウンで置いています。
         パールは実装が部分的です（未実装の効果は結果の行に出ます）</li>
       <li><b>バリアは付与したことだけを記録します。</b> 耐久値で被ダメージを吸収する計算はしません
         （「バリアを持つ味方の〜」系の効果は入ります）</li>
       <li><b>狙いは真ん中の敵に揃えています。</b> 単体・拡散とも、敵の並びの真ん中を狙います</li>
-      <li><b>選べるのは実装済みのキャラだけです。</b> まだ入っていないキャラ（元の刃・カフカ・鏡流など）は
+      <li><b>選べるのは実装済みのキャラだけです。</b> まだ入っていないキャラ（元の刃・鏡流など）は
         選択肢に出ません。アッパー調整のあるキャラは調整後の性能で計算しています</li>
       <li id="caveat-break" hidden><b>弱点撃破は試験中です。</b>
         敵 3 体は同じ靭性・全属性弱点で揃えています。撃破の行動遅延は 25% 固定、
         「弱点撃破状態の敵に会心率アップ」は<b>撃破中の敵が 1 体でもいる間ずっと</b>
-        乗る近似です。超撃破と、撃破の属性別効果（裂傷・燃焼・纏縛など）はまだありません</li>
+        乗る近似です。超撃破と撃破の属性別効果（裂創・燃焼・纏縛など）は入っています。
+        「精鋭エネミー以上」を条件にする効果は、敵を全員精鋭以上として扱います</li>
     </ul>
     <p>キャラごとの細かい未実装は、結果の行にある「未実装」の注記に出ます。</p>
+  </details>
+  <details class="caveats" id="changes">
+    <summary>v0.11 の変更点（2026-09-27）</summary>
+    <ul>
+      <li><b>キャラを 12 体追加:</b> 銀狼・カフカ・ブラックスワン（いずれもアッパー調整後）・アベンチュリン・
+        ケリュドラ・セイレンス・開拓者（調和）・ブートヒル・乱破・ダリア・霊砂・帰忘の流離人。ホタルも選べるようにしました</li>
+      <li><b>遺物セットを全キャラ・全セットから選べるように</b>しました（4 個セット・オーナメントのボタンから）。
+        効果が未実装のセットは選べません</li>
+      <li>敵の速度を選べるようにしました。「敵が攻撃する」は 1 ダメージ固定になりました</li>
+      <li><b>超撃破ダメージの計算を直しました。</b> 削靭値の単位を取り違えていて、超撃破が<b>本来の 3 倍</b>に
+        出ていました。前の版で選べたキャラには超撃破を出すキャラがいなかったため、これまでの数字は変わりません。
+        今回追加した超撃破のキャラ（開拓者（調和）・ホタル・ダリアなど）は、直した計算で出しています</li>
+      <li>2 ターン続く持続ダメージが 1 回しか入っていなかったのを直しました</li>
+    </ul>
   </details>
   <footer class="app-foot">
     <p><b>非公式のファンメイドツールです。</b>個人が趣味で作ったもので、
@@ -301,7 +344,7 @@
 <script>
 /* 静的サイト版: 計算はこのブラウザの中（Web Worker 上の Python）で行う */
 window.HSR_BACKEND = (() => {
-  const worker = new Worker("worker.js?v=61b0682002e8", { type: "module" });
+  const worker = new Worker("worker.js?v=d78b4a64d383", { type: "module" });
   const pending = new Map();
   let next = 0;
   worker.onmessage = (ev) => {
@@ -433,6 +476,91 @@ function openPicker(current, taken, onPick, title) {
 }
 function el(tag, cls) { const e = document.createElement(tag); if (cls) e.className = cls; return e; }
 
+function relicById(id) { return id ? state.opts.relic_sets.find((r) => r.id === String(id)) : null; }
+function relicIcon(id) {
+  const r = relicById(id);
+  const fb = r ? esc(r.name.slice(0, 2)) : "―";
+  return `<span class="relic-art"><span class="fallback">${fb}</span>` +
+    (r ? `<img src="${state.opts.icon_base}/icon/relic/${esc(r.id)}.png" alt="" loading="lazy" onerror="this.remove()">` : "") +
+    `</span>`;
+}
+
+/* 遺物セットのモーダル（2026-09-27 ユーザー指定。キャラ選択と同じ作り）。
+   「推奨」（キャラデータの推奨とキャラ固有の候補）を先頭に、残りを全部並べる。
+   タイルにカーソルを載せる・フォーカスすると、下の欄に効果文が出る */
+function openRelicPicker(kind, c, current, onPick) {
+  const isOrn = kind === "ornament";
+  const def = isOrn ? c.default_orn : c.default_cavern;
+  const rec = isOrn ? c.rec_orns : c.rec_caverns;
+  const dlg = $("#picker");
+  dlg.innerHTML = "";
+  const head = el("div", "picker-head");
+  const h = el("h2"); h.textContent = `${c.name}の${isOrn ? "オーナメント（2個セット）" : "トンネル遺物（4個セット）"}`;
+  const q = el("input"); q.type = "text"; q.placeholder = "名前・効果で絞り込む";
+  q.setAttribute("aria-label", "名前・効果で絞り込む");
+  const close = iconBtn("閉じる", "閉じる（Esc）", () => dlg.close());
+  head.append(h, q, close);
+  const body = el("div", "picker-body");
+  const detail = el("div", "relic-detail");
+  const show = (r) => {
+    if (!r) { detail.innerHTML = `<p class="hint">セットにカーソルを載せると効果が出ます</p>`; return; }
+    const tags = [r.id === def ? "既定" : "", rec.includes(r.id) ? "推奨" : ""].filter(Boolean)
+      .map((t) => `<span class="badge">${t}</span>`).join("");
+    detail.innerHTML = `<div class="dh">${relicIcon(r.id)}<b>${esc(r.name)}</b>${tags}</div>` +
+      r.effects.map((e) => `<p><span class="n">${e.n}セット</span>${esc(e.text)}` +
+        (r.missing.includes(e.n) ? ` <span class="warn">未実装（選べません）</span>` : "") + `</p>`).join("");
+  };
+  const all = state.opts.relic_sets.filter((r) => r.kind === kind);
+  const recSets = rec.map((id) => all.find((r) => r.id === id)).filter(Boolean);
+  const groups = [["推奨", recSets], [isOrn ? "すべてのオーナメント" : "すべてのトンネル遺物",
+                   all.filter((r) => !rec.includes(r.id))]];
+  const tiles = [];
+  groups.forEach(([label, sets]) => {
+    if (!sets.length) return;
+    const g = el("section", "picker-group");
+    const h3 = el("h3"); h3.innerHTML = `${esc(label)}<span class="n">${sets.length}</span>`;
+    const grid = el("div", "picker-grid");
+    sets.forEach((r) => {
+      /* 効果が未実装の段があるセットは選べない（既定のセットだけは戻せるように押せる） */
+      const blocked = r.missing.length > 0 && r.id !== def;
+      const b = el("button", "tile relic" + (r.id === current ? " current" : "") + (blocked ? " missing" : ""));
+      b.type = "button";
+      b.title = r.effects.map((e) => `${e.n}セット: ${e.text}`).join("\n");
+      const art = el("div", "art"); art.innerHTML = relicIcon(r.id);
+      const name = el("div", "name"); name.textContent = r.name;
+      b.append(art, name);
+      const tag = r.id === def ? "既定" : (blocked ? "未実装" : "");
+      if (tag) { const t = el("span", "tag" + (tag === "既定" ? "" : " warn")); t.textContent = tag; b.appendChild(t); }
+      if (blocked) { b.setAttribute("aria-disabled", "true"); b.title = "効果が未実装のため選べません。" + b.title; }
+      b.addEventListener("click", () => { if (blocked) return; dlg.close(); onPick(r.id); });
+      b.addEventListener("mouseenter", () => show(r));
+      b.addEventListener("focus", () => show(r));
+      grid.appendChild(b);
+      tiles.push([b, r]);
+    });
+    g.append(h3, grid);
+    body.appendChild(g);
+  });
+  const empty = el("p", "picker-empty"); empty.textContent = "該当するセットがありません"; empty.hidden = true;
+  body.appendChild(empty);
+  q.addEventListener("input", () => {
+    const word = q.value.trim();
+    tiles.forEach(([b, r]) => {
+      b.hidden = !!word && !r.name.includes(word) && !r.effects.some((e) => e.text.includes(word));
+    });
+    body.querySelectorAll(".picker-group").forEach((g) => {
+      g.hidden = ![...g.querySelectorAll("button.tile")].some((b) => !b.hidden);
+    });
+    empty.hidden = tiles.some(([b]) => !b.hidden);
+  });
+  dlg.append(head, body, detail);
+  show(relicById(current));
+  dlg.onclick = (ev) => { if (ev.target === dlg) dlg.close(); };
+  dlg.showModal();
+  const cur = body.querySelector("button.tile.current");
+  if (cur) { cur.focus(); cur.scrollIntoView({ block: "center" }); } else { q.focus(); }
+}
+
 function save() {
   try { localStorage.setItem(STORE, JSON.stringify({ teams: state.teams, settings: state.settings })); } catch (e) {}
 }
@@ -477,12 +605,12 @@ function sanitize(teams) {
         tech: (c.attack_technique && m && m.tech === false) ? false : true,
         /* 必殺技の撃ち方。温存を選べないキャラや古い保存データは既定に戻す */
         ult: c.ults.some(([v]) => v === (m && m.ult)) ? m.ult : "asap",
-        /* 遺物構成。選べないキャラや古い保存データは既定（先頭）に戻す */
-        relic: c.relics.length ? (c.relics.some(([v]) => v === (m && m.relic)) ? m.relic : c.relics[0][0]) : null,
+        /* トンネル遺物。知らない ID・既定と同じなら null（既定）に戻す */
+        relic: (m && relicById(m.relic) && relicById(m.relic).kind === "cavern" && !relicById(m.relic).missing.length && m.relic !== c.default_cavern) ? m.relic : null,
         /* キャラ固有のモード（姫子・旅立ちの同行協定）。選べないキャラや古い保存データは既定（先頭） */
         mode: (c.modes || []).length ? (c.modes.some(([v]) => v === (m && m.mode)) ? m.mode : c.modes[0][0]) : null,
-        /* オーナメント。全キャラ共通で選べる。古い保存データは既定に戻す */
-        orn: c.ornaments.some(([v]) => v === (m && m.orn)) ? m.orn : "default",
+        /* オーナメント。知らない ID・既定と同じなら既定に戻す */
+        orn: (m && relicById(m.orn) && relicById(m.orn).kind === "ornament" && !relicById(m.orn).missing.length && m.orn !== c.default_orn) ? m.orn : "default",
         /* 手動調整は知っている項目の数字だけ残す（キャラに無い項目はサーバーが弾く） */
         adj: Object.fromEntries(Object.entries((m && m.adj) || {}).filter(([k, v]) =>
           state.opts.screen_stats.some((st) => st.key === k) && Number.isFinite(+v) && v !== "" && v !== null)
@@ -590,6 +718,8 @@ function renderSettings() {
     wrap("敵の数", segmented([1, 2, 3, 4, 5], s.enemies, (v) => { s.enemies = v; }, (v) => `${v} 体`)),
     field("敵 Lv", selectOf([[90, "90"], [95, "95"]], s.enemy_level, (v) => { s.enemy_level = +v; changed(); }, "敵のレベル")),
     field("敵の耐性", selectOf([[0.2, "20%（通常）"], [0, "0%（弱点）"]], s.enemy_res, (v) => { s.enemy_res = +v; changed(); }, "敵の耐性")),
+    field("敵の速度", selectOf([80, 100, 120, 132, 144, 158, 180, 200].map((v) => [v, v === 120 ? "120（既定）" : String(v)]),
+      s.enemy_speed || 120, (v) => { s.enemy_speed = +v; changed(); }, "敵の速度")),
     field("サイクル", selectOf([[1, "1"], [2, "2"], [3, "3"], [5, "5"]], s.cycles, (v) => { s.cycles = +v; changed(); }, "サイクル数")),
     field("秘技を使う", check(s.technique, (v) => { s.technique = v; })),
     field("敵が攻撃する", check(s.enemy_attacks, (v) => { s.enemy_attacks = v; if (!v) s.enemy_hit_energy = false; })),
@@ -718,17 +848,6 @@ function slot(t, m, mi) {
     ultSel.classList.toggle("changed", (m.ult || "asap") !== "asap");
     ultSel.title = "必殺技を撃つタイミング";
   }
-  const relicDefault = c.relics.length ? c.relics[0][0] : null;
-  const relicSel = c.relics.length > 1 ? selectOf(c.relics, m.relic || relicDefault, (v) => {
-    m.relic = v; relicSel.classList.toggle("changed", v !== relicDefault);
-    gearLabel.textContent = gearText();
-    changed();
-  }, `${c.name}の遺物セット`) : null;
-  if (relicSel) {
-    relicSel.classList.add("rot");
-    relicSel.classList.toggle("changed", (m.relic || relicDefault) !== relicDefault);
-    relicSel.title = "遺物セットの組み合わせ";
-  }
   const modeDefault = (c.modes || []).length ? c.modes[0][0] : null;
   const modeSel = (c.modes || []).length > 1 ? selectOf(c.modes, m.mode || modeDefault, (v) => {
     m.mode = v; modeSel.classList.toggle("changed", v !== modeDefault); changed();
@@ -738,26 +857,29 @@ function slot(t, m, mi) {
     modeSel.classList.toggle("changed", (m.mode || modeDefault) !== modeDefault);
     modeSel.title = c.mode_label || "モード";
   }
-  const ornSel = selectOf(c.ornaments, m.orn || "default", (v) => {
-    m.orn = v; ornSel.classList.toggle("changed", v !== "default");
-    gearLabel.textContent = gearText();
-    changed();
-  }, `${c.name}のオーナメント`);
-  ornSel.classList.add("rot");
-  ornSel.classList.toggle("changed", (m.orn || "default") !== "default");
-  ornSel.title = "オーナメント(2個セット)の差し替え。ウェンワーク・ルサカは全キャラ共通で選べます";
-  /* 今どの遺物セットを着ているか。4pc はキャラ選択(relicSel が無ければ固定)、
-     2pc はオーナメント選択から、確認欄を結果側からここへ移した(2026-09-18 ユーザー指定) */
-  const gearText = () => {
-    const cavern = relicSel
-      ? (c.relics.find(([k]) => k === (m.relic || relicDefault)) || [, c.cavern_name])[1]
-      : c.cavern_name;
-    const orn = (c.ornaments.find(([k]) => k === (m.orn || "default")) || [, c.ornaments[0][1]])[1];
-    return `${cavern} / ${orn}`;
+  /* 遺物セット。**全キャラ共通で全セットから選べる**（2026-09-27 ユーザー指定）。
+     アイコン付きのボタンを押すとモーダルが開く。既定から変えると太枠になる */
+  const relicBtn = (kind) => {
+    const isOrn = kind === "ornament";
+    const def = isOrn ? c.default_orn : c.default_cavern;
+    const cur = isOrn ? ((m.orn && m.orn !== "default") ? m.orn : def) : (m.relic || def);
+    const info = relicById(cur);
+    const b = el("button", "pick relic-pick" + (cur !== def ? " changed" : ""));
+    b.type = "button";
+    b.innerHTML = `${relicIcon(cur)}<span class="k">${isOrn ? "2pc" : "4pc"}</span>` +
+      `<span class="nm">${esc(info ? info.name : "（なし）")}</span>` +
+      (info && info.missing.length ? `<span class="warn" title="効果が未実装の段があります">未実装あり</span>` : "");
+    b.title = `${isOrn ? "オーナメント（2個セット）" : "トンネル遺物（4個セット）"}: ${info ? info.name : "なし"}` +
+      `${cur !== def ? "（既定から変更）" : "（既定）"}。押すと一覧から選べます`;
+    b.addEventListener("click", () => openRelicPicker(kind, c, cur, (v) => {
+      if (isOrn) m.orn = (v === def) ? "default" : v;
+      else m.relic = (v === def) ? null : v;
+      renderTeams(); changed();
+    }));
+    return b;
   };
-  const gearLabel = el("div", "gear-label");
-  gearLabel.textContent = gearText();
-  gearLabel.title = "今装備している遺物セット(4個+2個)";
+  const relicRow = el("div", "relics");
+  relicRow.append(relicBtn("cavern"), relicBtn("ornament"));
   /* 「誰かを選んで〜する」効果の対象。選択肢は今の編成の他のメンバーなので毎回作り直す
      （水着ロビンの「スペシャルゲスト」など。2026-09-19 ユーザー指定）。
      **何を決める欄なのかを見出しで出し、「既定」は実際に当たる相手まで書く** */
@@ -814,9 +936,8 @@ function slot(t, m, mi) {
   label();
   fields.append(who, es, lc, ms, rot);
   if (ultSel) fields.append(ultSel);
-  if (relicSel) fields.append(relicSel);
   if (modeSel) fields.append(modeSel);
-  fields.append(ornSel, gearLabel);
+  fields.append(relicRow);
   if (advField) fields.append(advField);
   if (techField) fields.append(techField);
   fields.append(toggle, panel);
@@ -962,7 +1083,7 @@ function renderResults() {
     order.map((n) => `<td>${fmt(r.breakdown[n] || 0)}</td>`).join("") + `</tr>`).join("");
 
   root.innerHTML =
-    `<p class="meta">敵 Lv${s.enemy_level} ／ ${s.enemies} 体 ／ 耐性 ${Math.round(s.enemy_res * 100)}% ／ ${s.cycles} サイクル ／ ` +
+    `<p class="meta">敵 Lv${s.enemy_level} ／ ${s.enemies} 体 ／ 耐性 ${Math.round(s.enemy_res * 100)}% ／ 速度 ${s.enemy_speed || 120} ／ ${s.cycles} サイクル ／ ` +
     `${s.technique ? "秘技あり" : "秘技なし"}${s.enemy_attacks ? " ／ 敵の攻撃あり" : ""}</p>` +
     `<p class="hint">数字は DPA（行動値あたりダメージ）。右の % は先頭の編成を 100% としたときの比。棒の各段にカーソルを乗せるとキャラごとの内訳が出ます</p>` +
     `<div class="legend">${legend}</div><div class="wrap">${body}</div>` +
