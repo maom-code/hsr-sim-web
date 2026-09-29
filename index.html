@@ -67,6 +67,8 @@
   .art img { width: 100%; height: 100%; object-fit: cover; display: block; position: relative; z-index: 1; }
   .art .fallback { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
                    font-size: 11px; line-height: 1.15; text-align: center; color: var(--text-secondary); padding: 2px; }
+  /* 画像が読めたら代わりの文字は隠す。透過している部分から裏の文字が透けて見えるため（2026-09-29 ユーザー指摘） */
+  .fallback[hidden] { display: none; }
   .art .lc { position: absolute; right: 0; bottom: 0; width: 21px; height: 21px; z-index: 2;
              border-radius: 4px 0 0 0; background: #fff; object-fit: contain; }
 
@@ -319,9 +321,7 @@
         ゲームの「出演番号」の順（パール → 爻光 → 開拓者 → 火花 → 緋英 → 水着アベンチュリン → 銀狼LV.999）にしました。
         火花・緋英の入った編成は数字が 1 割ほど動きます（例: 火花・銀狼・爻光・パールで +40%）</li>
       <li>緋英の軌跡「楽しむ大衆を眺めて」で、開拓者が「出演番号が緋英より若い味方」に数えられていなかったのを直しました</li>
-      <li><b>パールを実装版の性能に合わせました</b>（ゲームデータ 4.5.54）。星魂 1（愉悦度が固定値に）・星魂 4
-        （愉悦スキルの倍率 2 倍）・軌跡（治癒量・効果抵抗）・光円錐「明日に捧げる色」（被ダメージ 22% 固定・EP 10 回復）が
-        ベータから変わっています。愉悦キャラが 2 人の編成では数字が上がります（例: 刃・不死途・水着アベンチュリン・パールで +4%）</li>
+      <li><b>パールを実装しました。</b></li>
       <li>遺物「折れた竜骨」2 個セットが、パールの軌跡で効果抵抗の条件を満たしても発動していなかったのを直しました</li>
       <li>遺物「仮想空間を漫遊するメッセンジャー」4 個セットを選べるようにしました</li>
     </ul>
@@ -334,9 +334,9 @@
     <p>キャラクターのアイコンは
       <a href="https://github.com/Mar-7th/StarRailRes" target="_blank" rel="noopener noreferrer">StarRailRes</a>
       のものを使わせてもらっています。ゲーム内の名称・画像は HoYoverse に帰属します。</p>
-    <p>間違いを見つけたら
-      <a href="https://x.com/houryu_ji" target="_blank" rel="noopener noreferrer">@houryu_ji</a>
-      まで教えてもらえると助かります。</p>
+    <p>計算の間違いや、ご意見・ご要望は
+      <a href="https://docs.google.com/forms/d/e/1FAIpQLSc-XlbUCaP6GeFkJbf81f1aQHHPMC4yABBNv2A_Be__XK5JfQ/viewform" target="_blank" rel="noopener noreferrer">要望フォーム</a>
+      から送ってください。</p>
     <p class="ver" id="app-foot-ver"></p>
   </footer>
 </div>
@@ -344,7 +344,7 @@
 <script>
 /* 静的サイト版: 計算はこのブラウザの中（Web Worker 上の Python）で行う */
 window.HSR_BACKEND = (() => {
-  const worker = new Worker("worker.js?v=9ad2a989d74d", { type: "module" });
+  const worker = new Worker("worker.js?v=fa4b41cc505b", { type: "module" });
   const pending = new Map();
   let next = 0;
   worker.onmessage = (ev) => {
@@ -481,7 +481,7 @@ function relicIcon(id) {
   const r = relicById(id);
   const fb = r ? esc(r.name.slice(0, 2)) : "―";
   return `<span class="relic-art"><span class="fallback">${fb}</span>` +
-    (r ? `<img src="${state.opts.icon_base}/icon/relic/${esc(r.id)}.png" alt="" loading="lazy" onerror="this.remove()">` : "") +
+    (r ? `<img src="${state.opts.icon_base}/icon/relic/${esc(r.id)}.png" alt="" loading="lazy" onload="hideFallback(this)" onerror="this.remove()">` : "") +
     `</span>`;
 }
 
@@ -785,7 +785,13 @@ function artHtml(charId, name, lcId) {
   const base = state.opts.icon_base;
   const lc = lcId ? `<img class="lc" src="${base}/icon/light_cone/${esc(lcId)}.png" alt="" loading="lazy" onerror="this.remove()">` : "";
   return `<span class="fallback">${esc(shortName(name))}</span>` +
-         `<img src="${base}/icon/character/${esc(charId)}.png" alt="" loading="lazy" onerror="this.remove()">${lc}`;
+         `<img src="${base}/icon/character/${esc(charId)}.png" alt="" loading="lazy" onload="hideFallback(this)" onerror="this.remove()">${lc}`;
+}
+
+/* 画像が読めたら、同じ枠の代わりの文字（名前の頭）を隠す。読めなかったとき（アイコンがまだ無いキャラ）だけ文字が残る */
+function hideFallback(img) {
+  const fb = img.parentNode && img.parentNode.querySelector(".fallback");
+  if (fb) fb.hidden = true;
 }
 
 function slot(t, m, mi) {
